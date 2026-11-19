@@ -1,8 +1,9 @@
 /* BangTurn app, installed as "bangturn.app.js".
    OWNED BY: UI task. Screens and menu from docs/spec.md "UI":
-   - idle:    1:00:00, "Turn around at 30:00", "Press to start"
-   - running: big h:mm:ss countdown of the whole walk, "Turn around at 30:00"
-              then "Heading home", average speed rows, progress bar
+   - idle:    1:00:00, time of day, "Press to start"
+   - running: big h:mm:ss countdown of the whole walk, a small row with the
+              time of day and the walk's start time, average speed rows,
+              progress bar
    - menu:    Resume, -1 min (offset shown), Cancel walk; back to the
               countdown after 10 s with no input
    Keep the startup alert hook at the bottom (see docs/ARCHITECTURE.md). */
@@ -13,6 +14,7 @@ var speed = require("bangturn.speed");
 var MENU_TIMEOUT = 10000;
 var screen;      // "main" or "menu"
 var drawTimer;   // pending redraw of the main screen
+var clockTimer;  // pending redraw of just the time of day
 var menuTimer;   // pending return from the menu to the main screen
 
 Bangle.loadWidgets();
@@ -33,10 +35,22 @@ function kph(v) {
   return Math.floor(n / 10) + "." + (n % 10) + " kph";
 }
 
-/* What the main screen shows, as plain data (also used by the tests) */
-function lines(st) {
+function pad(n) { return ("0" + n).substr(-2); }
+/* "21:14:05" (or "21:14" without seconds) for a Date or ms timestamp */
+function hms(t, secs) {
+  var d = new Date(t);
+  return pad(d.getHours()) + ":" + pad(d.getMinutes()) + (secs ? ":" + pad(d.getSeconds()) : "");
+}
+
+/* What the main screen shows, as plain data (also used by the tests).
+   now: time of day, with seconds only while unlocked (locked redraws once
+   a minute, so seconds would be stale). start: the walk's start time,
+   moved earlier by any -1 min taps. */
+function lines(st, now) {
+  if (now === undefined) now = Date.now();
   var L = { time: bt.fmt(st.remaining), rows: [] };
-  L.sub = st.phase == "back" ? "Heading home" : "Turn around at " + bt.fmt(bt.TURN).substr(2);
+  L.now = hms(now, !Bangle.isLocked());
+  if (st.active) L.start = "Start " + hms(bt.startTime());
   if (!st.active) L.rows.push("Press to start");
   else {
     var sp = speed.get() || {};
@@ -44,6 +58,23 @@ function lines(st) {
     if (st.phase == "back") L.rows.push("Back " + kph(sp.back));
   }
   return L;
+}
+
+/* The small row under the countdown: time of day, plus the start time
+   on the right during a walk */
+function drawClock(L) {
+  var R = Bangle.appRect, y = R.y + 62;
+  g.reset().clearRect(R.x, y - 11, R.x2, y + 11);
+  if (L.start) {
+    var hw = R.w / 2 - 4;
+    g.setFont("Vector", Math.min(fit(L.now, 18, hw), fit(L.start, 18, hw)));
+    g.setFontAlign(-1, 0).drawString(L.now, R.x + 3, y);
+    g.setFontAlign(1, 0).drawString(L.start, R.x2 - 3, y);
+  } else {
+    fit(L.now, 20, R.w - 4);
+    g.setFontAlign(0, 0).drawString(L.now, R.x + R.w / 2, y);
+  }
+  g.setFontAlign(0, 0);
 }
 
 /* Draws the main screen; returns the status it drew */
@@ -54,8 +85,7 @@ function draw() {
   g.reset().clearRect(R).setFontAlign(0, 0);
   fit(L.time, 46, w);
   g.drawString(L.time, x, y + 26);
-  fit(L.sub, 20, w);
-  g.drawString(L.sub, x, y + 62);
+  drawClock(L);
   L.rows.forEach(function (r, i) {
     fit(r, 22, w);
     g.drawString(r, x, y + 88 + i * 24);
@@ -76,15 +106,29 @@ function draw() {
 /* Redraw now, then every second while unlocked, every minute while locked.
    Timed to when the countdown's seconds (or minutes) change, like the
    widget, so no number is skipped or shown twice. Idle: nothing changes,
-   so no timer (a "bangturn" event redraws on start). */
+   so no timer (a "bangturn" event redraws on start).
+   The time of day has its own timer on the wall clock's seconds (minutes
+   while locked), which only redraws that row. */
 function tick() {
-  if (drawTimer) clearTimeout(drawTimer);
-  drawTimer = undefined;
+  stopTimers();
   if (screen != "main") return;
   var st = draw();
-  if (!st.active) return;
   var period = Bangle.isLocked() ? 60000 : 1000;
+  clockTimer = setTimeout(clockTick, period - (Date.now() % period) + 20);
+  if (!st.active) return;
   drawTimer = setTimeout(tick, (st.remaining % period || period) + 20);
+}
+function clockTick() {
+  clockTimer = undefined;
+  if (screen != "main") return;
+  drawClock(lines(bt.status()));
+  var period = Bangle.isLocked() ? 60000 : 1000;
+  clockTimer = setTimeout(clockTick, period - (Date.now() % period) + 20);
+}
+function stopTimers() {
+  if (drawTimer) clearTimeout(drawTimer);
+  if (clockTimer) clearTimeout(clockTimer);
+  drawTimer = clockTimer = undefined;
 }
 
 function stopMenuTimer() {
@@ -119,8 +163,7 @@ function start() {
 }
 
 function showWalkMenu(selected) {
-  if (drawTimer) clearTimeout(drawTimer);
-  drawTimer = undefined;
+  stopTimers();
   screen = "menu";
   var off = bt.read().offset || 0;
   var menu = { "": { title: "BangTurn", back: showMain, selected: selected || 0 } };

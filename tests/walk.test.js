@@ -36,7 +36,13 @@ const state = h => h.eval(`${BT}.read()`);
 const ids = h => h.eval(`${BT}.getSched().map(function(a){return a.id.substr(9)})`);
 const gpsOn = h => h.eval("!!(global.GPS_USERS && GPS_USERS.bangturn)");
 const gpsFile = h => h.eval('require("Storage").readJSON("bangturn.gps.json",1)||false');
-const screen = h => h.eval(`lines(${BT}.status())`); // app.js: what the main screen shows
+// app.js: what the main screen shows, minus the time of day and start time
+const screen = h => {
+  const L = h.eval(`lines(${BT}.status())`);
+  delete L.now;
+  delete L.start;
+  return L;
+};
 const widget = h => h.eval("WIDGETS.bangturn.width");
 const speeds = h => h.eval(`${SP}.get()`);
 /* the inverted TURN AROUND screen is showing */
@@ -89,7 +95,7 @@ async function startInApp(h) {
 test("a whole walk: start, turnaround alarm, countdown buzzes, silent end", async h => {
   await record(h);
   await h.load("bangturn.app.js");
-  assert.eq(screen(h), { time: "1:00:00", rows: ["Press to start"], sub: "Turn around at 30:00" }, "idle screen");
+  assert.eq(screen(h), { time: "1:00:00", rows: ["Press to start"] }, "idle screen");
   assert.eq(widget(h), 0, "no widget when idle");
   assert(!gpsOn(h), "GPS off when idle");
 
@@ -132,7 +138,7 @@ test("a whole walk: start, turnaround alarm, countdown buzzes, silent end", asyn
   assert.eq(buzzes(h).length, n, "no buzzes after unlocking");
   assert.eq(h.eval("screen"), "main");
   const t = screen(h);
-  assert.eq([t.sub, t.rows], ["Heading home", ["Out 5.0 kph", "Back -- kph"]]);
+  assert.eq(t.rows, ["Out 5.0 kph", "Back -- kph"], "way back");
   assert.eq(ids(h), COUNTDOWN.concat(["end"]));
 
   // Walk back at 4 kph: Out stays frozen
@@ -169,7 +175,7 @@ test("a whole walk: start, turnaround alarm, countdown buzzes, silent end", asyn
   assert.eq(widget(h), 0, "widget hidden");
 });
 
-test("-1 min from the menu across the turnaround: no alarm, heading home", async h => {
+test("-1 min from the menu across the turnaround: no alarm, way back rows", async h => {
   await record(h);
   await startInApp(h);
   const w = walker(h);
@@ -190,7 +196,7 @@ test("-1 min from the menu across the turnaround: no alarm, heading home", async
   assert.eq(file(h), "bangturn.app.js");
   pick(h, "Resume");
   const t = screen(h);
-  assert.eq([t.sub, t.rows], ["Heading home", ["Out 5.0 kph", "Back -- kph"]]);
+  assert.eq(t.rows, ["Out 5.0 kph", "Back -- kph"], "way back");
   // the rest of the walk carries on as normal: next is 15 min left
   w.walk(4, 300);
   await h.wait(200);
@@ -217,7 +223,7 @@ test("cancel from the menu mid-walk stops everything", async h => {
   assert.eq(speeds(h), { out: null, back: null });
   assert(h.eval("EV").includes("cancel"));
   assert.eq(h.eval("screen"), "main");
-  assert.eq(screen(h), { time: "1:00:00", rows: ["Press to start"], sub: "Turn around at 30:00" });
+  assert.eq(screen(h), { time: "1:00:00", rows: ["Press to start"] });
   assert.eq(widget(h), 0, "widget hidden");
   clearLog(h);
   await h.wait(4500);
@@ -302,7 +308,7 @@ test("watch off across the turnaround: late alarm at boot, missed buzz skipped",
   assert.eq(ids(h), ["left8", "left4", "left1", "end"], "missed entries dropped");
   h.tx("Bangle.setLocked(false);Bangle.emit('lock',false)");
   await h.wait(300);
-  assert.eq(screen(h).sub, "Heading home");
+  assert.eq(screen(h).rows.length, 2, "Out and Back rows");
 });
 
 test("a countdown buzz sched delivers late after a reboot is skipped", async h => {
