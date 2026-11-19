@@ -1,6 +1,6 @@
 # BangTurn: turnaround timer for Bangle.js 2
 
-**Status:** v1.3 (2026-11-19)
+**Status:** v1.4 (2026-11-19)
 
 ## Purpose
 
@@ -13,7 +13,7 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 3. You can leave the app and go back to the clock. The timer keeps running in the background.
 4. When the countdown reaches 30 minutes left, the watch vibrates with a distinct pattern and shows **TURN AROUND**.
 5. The alarm stops as soon as the watch unlocks (you raise your wrist to look, press the button or tap), or after 6 seconds, whichever comes first.
-6. The countdown carries on for the walk back, with short countdown buzzes at 15, 8, 4 and 1 minutes left. At zero the watch gives a "walk done" buzz and returns to the idle screen.
+6. The countdown carries on for the walk back, with short countdown buzzes at 15, 8, 4 and 1 minutes left. At zero the walk ends silently (no buzz): GPS turns off and the app returns to the idle screen.
 
 ## Duration
 
@@ -49,8 +49,8 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
   - 8 min left: 2 buzzes
   - 4 min left: 3 buzzes
   - 1 min left: 4 buzzes
-- Walk done (countdown hits zero): one long buzz (~1 s), so it can't be mistaken for a countdown buzz. No repeats.
-- Countdown and walk-done buzzes also play in Quiet Mode.
+- Walk done (countdown hits zero): **no buzz**.
+- Countdown buzzes also play in Quiet Mode.
 - Turnaround alarm: distinct and prominent. A continuous pattern of long full-strength buzzes (e.g. 600 ms on, 200 ms off), unlike any notification buzz, with the screen lit.
 - It stops when the watch unlocks (Bangle `lock` event fires with `false`, i.e. you looked at it or touched it) or after **6 seconds**, whichever comes first. No repeats.
 - **Buzzes in Quiet Mode**, since this alarm is the whole point of the app.
@@ -58,7 +58,7 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 ## Background behaviour
 
 - Use the built-in **`sched`** library (the same one the Alarm and Timer apps use) rather than an in-app `setTimeout`. That way the timer survives leaving the app, opening other apps, or the watch going back to the clock.
-- On start, BangTurn writes six timer entries to `sched` (turnaround at 30 min; countdown buzzes at 45, 52, 56 and 59 min; walk done at 60 min), each with `js` pointing back to BangTurn, so the alert opens BangTurn wherever you are. The start time is saved in `bangturn.json` so the countdown can be redrawn after leaving and reopening the app.
+- On start, BangTurn writes six timer entries to `sched` (turnaround at 30 min; countdown buzzes at 45, 52, 56 and 59 min; silent walk end at 60 min, which turns GPS off), each with `js` pointing back to BangTurn, so the alert opens BangTurn wherever you are. The start time is saved in `bangturn.json` so the countdown can be redrawn after leaving and reopening the app.
 - Requires the **Scheduler** (`sched`) app as a dependency in `metadata.json`.
 - If the watch reboots mid-walk, `sched` restores the timer.
 
