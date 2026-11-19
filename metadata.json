@@ -1,0 +1,26 @@
+{
+  "id": "bangturn",
+  "name": "BangTurn",
+  "shortName": "BangTurn",
+  "version": "0.01",
+  "description": "Turnaround timer for out-and-back walks: buzzes at the halfway point of a one-hour walk, with walk-back countdown buzzes and GPS average speed.",
+  "icon": "app.png",
+  "type": "app",
+  "tags": "outdoors,timer,gps",
+  "supports": ["BANGLEJS2"],
+  "readme": "README.md",
+  "dependencies": { "scheduler": "type" },
+  "storage": [
+    { "name": "bangturn.app.js", "url": "app.js" },
+    { "name": "bangturn.img", "url": "app-icon.js", "evaluate": true },
+    { "name": "bangturn", "url": "lib.js" },
+    { "name": "bangturn.alerts", "url": "alerts.js" },
+    { "name": "bangturn.speed", "url": "speed.js" },
+    { "name": "bangturn.boot.js", "url": "boot.js" },
+    { "name": "bangturn.wid.js", "url": "widget.js" }
+  ],
+  "data": [
+    { "name": "bangturn.json" },
+    { "name": "bangturn.gps.json" }
+  ]
+}

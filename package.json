@@ -1,0 +1,9 @@
+{
+  "name": "bangturn",
+  "private": true,
+  "description": "BangTurn: turnaround timer for Bangle.js 2",
+  "scripts": {
+    "test": "node tests/run.js",
+    "setup-emulator": "sh tests/setup-emulator.sh"
+  }
+}
