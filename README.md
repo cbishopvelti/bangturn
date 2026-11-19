@@ -67,9 +67,10 @@ before a check that needs the watch on your wrist.
    the time of day with seconds, `60:00` and "Press to start". No widget on
    the clock while idle.
 2. **Start.** A button press (or a tap) gives one short buzz and the countdown
-   runs, with the time of day and "Start HH:MM" side by side above it. While
-   the watch is locked the seconds go: the countdown shows `60 min` and the
-   time HH:MM. No minutes number by the battery inside the app. Swipe right
+   runs, with the time of day and "Start HH:MM:SS" side by side above it.
+   While the watch is locked the seconds go: the countdown shows just `60`
+   (in the same spot) and the time HH:MM; the start time keeps its seconds.
+   No minutes number by the battery inside the app. Swipe right
    (or long-press) back to the clock: the widget shows `60`, and reopening
    the app shows the right time.
 3. **Button stops the alarm.** Start a turnaround test, go to the clock and

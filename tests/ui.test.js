@@ -18,11 +18,12 @@ function fakeSpeed(h, get) {
 function screenText(h) {
   const L = h.eval(`lines(${BT}.status())`);
   delete L.now;
+  delete L.full;
   return L;
 }
-/* "HH:MM" of a watch timestamp, as the watch formats it */
-function hm(h, t) {
-  return h.eval(`(function(d){return ("0"+d.getHours()).substr(-2)+":"+("0"+d.getMinutes()).substr(-2)})(new Date(${t}))`);
+/* "HH:MM:SS" of a watch timestamp, as the watch formats it */
+function hms(h, t) {
+  return h.eval(`(function(d){function p(n){return ("0"+n).substr(-2)}return p(d.getHours())+":"+p(d.getMinutes())+":"+p(d.getSeconds())})(new Date(${t}))`);
 }
 /* Record strings drawn to the screen in global.DRAWN */
 function spyDraw(h) {
@@ -91,7 +92,7 @@ test("running out: countdown, time of day and start time, Out row", async h => {
   await h.load("bangturn.app.js");
   const t = screenText(h);
   assert(t.time == "48:00" || t.time == "47:59" || t.time == "47:58", "time " + t.time);
-  assert.eq(t.start, "Start " + hm(h, now - 12 * MIN));
+  assert.eq(t.start, "Start " + hms(h, now - 12 * MIN));
   assert.eq(t.rows, ["Out -- kph"], "no fix yet");
   h.tx('Bangle.setLocked(false)');
   spyDraw(h);
@@ -102,16 +103,20 @@ test("running out: countdown, time of day and start time, Out row", async h => {
   assert(!drawn.some(s => s.indexOf("Turn around") >= 0), "no turnaround line");
 });
 
-test("countdown shows whole minutes left while locked", async h => {
+test("locked: countdown drops the seconds, minutes stay in place", async h => {
   h.tx(`${BT}.start(${h.eval("Date.now()") - 12 * MIN - 20000})`);
   await h.load("bangturn.app.js");
-  h.tx("Bangle.setLocked(false)");
-  assert(/^47:[34]\d$/.test(screenText(h).time), "unlocked: m:ss " + screenText(h).time);
-  h.tx("Bangle.setLocked(true)");
-  assert.eq(screenText(h).time, "48 min", "rounded up, like the widget");
-  spyDraw(h);
-  h.tx('Bangle.emit("lock",true)');
-  assert(h.eval("DRAWN").includes("48 min"), "drew it");
+  // record [string, x, font size] for each drawString
+  h.tx(`global.AT=[];(function(o){g.drawString=function(s,x){AT.push([""+s,Math.round(x),g.getFont()]);return o.apply(g,arguments)}})(g.drawString)`);
+  h.tx('Bangle.setLocked(false);Bangle.emit("lock",false)');
+  const open = h.eval("AT").find(a => /^47:[34]\d$/.test(a[0]));
+  assert(open, "unlocked: m:ss " + JSON.stringify(h.eval("AT")));
+  h.tx('AT=[];Bangle.setLocked(true);Bangle.emit("lock",true)');
+  assert.eq(screenText(h).time, "47", "just the minutes");
+  assert(/^Start \d\d:\d\d:\d\d$/.test(screenText(h).start), "start keeps its seconds: " + screenText(h).start);
+  const shut = h.eval("AT").find(a => a[0] == "47");
+  assert(shut, "drew 47: " + JSON.stringify(h.eval("AT")));
+  assert.eq([shut[1], shut[2]], [open[1], open[2]], "same x and font as in m:ss");
 });
 
 test("swipe right goes back to the clock, the walk keeps running", async h => {
@@ -173,7 +178,7 @@ test("redraws every second when unlocked, every minute when locked", async h => 
   assert(h.eval("Bangle.isLocked()"), "locked");
   h.tx("DRAWN=[]");
   await h.wait(2600);
-  assert.eq(h.eval('DRAWN.filter(function(s){return / min$/.test(s)}).length'), 0, "no redraw while locked");
+  assert.eq(h.eval('DRAWN.filter(function(s){return /^\\d+$/.test(s)}).length'), 0, "no redraw while locked");
   const next = h.eval("drawTimer&&global['\\xff'].timers[drawTimer].time/1000");
   assert(next > 1000 && next <= 60000, "next redraw on the minute: " + next);
 });
@@ -231,7 +236,7 @@ test("-1 min shows the offset and stays in the menu", async h => {
   h.tx('MENU["Resume"]()');
   const t = screenText(h);
   assert(t.time == "52:00" || t.time == "51:59" || t.time == "51:58", "time " + t.time);
-  assert.eq(t.start, "Start " + hm(h, now - 8 * MIN), "start time moved 3 min earlier");
+  assert.eq(t.start, "Start " + hms(h, now - 8 * MIN), "start time moved 3 min earlier");
 });
 
 test("-1 min past the turnaround switches to the way back", async h => {

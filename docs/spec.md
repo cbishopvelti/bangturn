@@ -25,7 +25,7 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 | State | Screen | Button | Touch |
 |---|---|---|---|
 | Idle | Time of day (HH:MM:SS) at the top, `60:00`, "Press to start" | Start | Tap: start. Swipe right: back to the clock |
-| Running | At the top a small row with the time of day (HH:MM:SS) on the left and the walk's start time ("Start HH:MM", moved earlier by any −1 min taps) on the right; big countdown of the whole walk in minutes and seconds (`48:00`, no hours), or whole minutes left rounded up (`48 min`) while the watch is locked; average speed row(s) in kph (see Speed), with a Back row once you've turned around; progress bar with a notch at the turnaround | Short press: opens a menu with **Resume**, **−1 min** and **Cancel walk**. Long press: Bangle default (back to clock, walk keeps running) | Swipe right: back to the clock (walk keeps running) |
+| Running | At the top a small row with the time of day (HH:MM:SS) on the left and the walk's start time ("Start HH:MM:SS", moved earlier by any −1 min taps, always with seconds since it never changes) on the right; big countdown of the whole walk in minutes and seconds (`48:00`, no hours), with the seconds left off while the watch is locked (`48`, drawn in the same place and size so the minutes don't move); average speed row(s) in kph (see Speed), with a Back row once you've turned around; progress bar with a notch at the turnaround | Short press: opens a menu with **Resume**, **−1 min** and **Cancel walk**. Long press: Bangle default (back to clock, walk keeps running) | Swipe right: back to the clock (walk keeps running) |
 | Menu | List: Resume, −1 min (shows current offset, e.g. "−1 min (−3)"), Cancel walk | Selects | Tap an item. Resume (or no input for 10 s) goes back to the countdown. −1 min moves the start time 1 minute earlier per tap and stays in the menu. Cancel walk clears all BangTurn `sched` timers and returns to idle |
 | Alert | "TURN AROUND", full-screen high contrast | Stops alarm | Tap: stops alarm |
 
@@ -66,7 +66,7 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 
 - GPS is the main drain: on for the hour of the walk, roughly 10 to 20% of the battery per walk. No HRM or Bluetooth use.
 - GPS runs from a small boot/background handler so speed keeps being tracked when you leave the app.
-- Redraw the countdown once a second only while the screen is unlocked. When locked, redraw once a minute. Seconds would freeze then, so while locked the countdown shows whole minutes (`48 min`) and the time of day shows HH:MM.
+- Redraw the countdown once a second only while the screen is unlocked. When locked, redraw once a minute. Seconds would freeze then, so while locked the countdown drops its `:ss` (minutes stay where they are) and the time of day shows HH:MM.
 - Nothing runs between ticks: the timer is a single `sched` wake-up, not a polling loop.
 
 ## Out of scope (v1)
