@@ -56,12 +56,14 @@ already partway through.
 before a check that needs the watch on your wrist.
 
 1. **Install.** BangTurn is in the launcher with its icon. Opening it shows
-   `1:00:00`, the time of day with seconds and "Press to start". No widget
-   on the clock while idle.
+   the time of day with seconds, `60:00` and "Press to start". No widget on
+   the clock while idle.
 2. **Start.** A button press (or a tap) gives one short buzz and the countdown
-   runs, with the time of day and "Start HH:MM" side by side under it (the
-   seconds disappear while the watch is locked). Long-press back to the
-   clock: the widget shows `60`, and reopening the app shows the right time.
+   runs, with the time of day and "Start HH:MM" side by side above it. While
+   the watch is locked the seconds go: the countdown shows `60 min` and the
+   time HH:MM. No minutes number by the battery inside the app. Swipe right
+   (or long-press) back to the clock: the widget shows `60`, and reopening
+   the app shows the right time.
 3. **Button stops the alarm.** Start a turnaround test, go to the clock and
    let the watch lock. When the alarm starts (strong long buzzes, lit screen,
    TURN AROUND), press the button once. The alarm stops at once and the

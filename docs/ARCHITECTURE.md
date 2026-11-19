@@ -190,7 +190,9 @@ How it tracks:
 `WIDGETS.bangturn`, width 0 when idle. Reads `require("bangturn").status()`
 and redraws on `"bangturn"` events and once a minute. Use the core module
 rather than reading files directly where you can, but keep the widget light
-since it loads in every app.
+since it loads in every app. The BangTurn app calls `WIDGETS.bangturn.hide()`
+after loading widgets: width 0 and no timer for the rest of that app, since
+the app shows the countdown itself.
 
 ## Tests
 

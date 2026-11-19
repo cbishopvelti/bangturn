@@ -1,9 +1,10 @@
 /* BangTurn app, installed as "bangturn.app.js".
    OWNED BY: UI task. Screens and menu from docs/spec.md "UI":
-   - idle:    1:00:00, time of day, "Press to start"
-   - running: big h:mm:ss countdown of the whole walk, a small row with the
-              time of day and the walk's start time, average speed rows,
-              progress bar
+   - idle:    60:00, time of day, "Press to start"
+   - running: small row with the time of day and the walk's start time,
+              big m:ss countdown of the whole walk ("48 min" while
+              locked), average speed rows, progress bar
+   Swipe right goes back to the clock. The minutes-left widget is hidden.
    - menu:    Resume, -1 min (offset shown), Cancel walk; back to the
               countdown after 10 s with no input
    Keep the startup alert hook at the bottom (see docs/ARCHITECTURE.md). */
@@ -18,6 +19,8 @@ var clockTimer;  // pending redraw of just the time of day
 var menuTimer;   // pending return from the menu to the main screen
 
 Bangle.loadWidgets();
+// the countdown is on screen, so the minutes-left widget is redundant here
+if (WIDGETS.bangturn && WIDGETS.bangturn.hide) WIDGETS.bangturn.hide();
 
 /* Largest Vector font size (<= max) at which `txt` fits in width w */
 function fit(txt, max, w) {
@@ -48,8 +51,11 @@ function hms(t, secs) {
    moved earlier by any -1 min taps. */
 function lines(st, now) {
   if (now === undefined) now = Date.now();
-  var L = { time: bt.fmt(st.remaining), rows: [] };
-  L.now = hms(now, !Bangle.isLocked());
+  var locked = Bangle.isLocked();
+  // locked redraws once a minute, so show whole minutes left (rounded up,
+  // like the widget) instead of seconds that would freeze
+  var L = { time: st.active && locked ? Math.ceil(st.remaining / 60000) + " min" : bt.fmt(st.remaining), rows: [] };
+  L.now = hms(now, !locked);
   if (st.active) L.start = "Start " + hms(bt.startTime());
   if (!st.active) L.rows.push("Press to start");
   else {
@@ -60,10 +66,10 @@ function lines(st, now) {
   return L;
 }
 
-/* The small row under the countdown: time of day, plus the start time
+/* The small row above the countdown: time of day, plus the start time
    on the right during a walk */
 function drawClock(L) {
-  var R = Bangle.appRect, y = R.y + 62;
+  var R = Bangle.appRect, y = R.y + 12;
   g.reset().clearRect(R.x, y - 11, R.x2, y + 11);
   if (L.start) {
     var hw = R.w / 2 - 4;
@@ -84,7 +90,7 @@ function draw() {
   var R = Bangle.appRect, x = R.x + R.w / 2, w = R.w - 4, y = R.y;
   g.reset().clearRect(R).setFontAlign(0, 0);
   fit(L.time, 46, w);
-  g.drawString(L.time, x, y + 26);
+  g.drawString(L.time, x, y + 48);
   drawClock(L);
   L.rows.forEach(function (r, i) {
     fit(r, 22, w);
@@ -151,7 +157,9 @@ function showMain() {
   Bangle.setUI({
     mode: "custom",
     btn: function () { if (bt.isActive()) showWalkMenu(); else start(); },
-    touch: function () { if (!bt.isActive()) start(); }
+    touch: function () { if (!bt.isActive()) start(); },
+    // swipe right: back to the clock (the walk keeps running)
+    swipe: function (lr) { if (lr > 0) load(); }
   });
   tick();
 }

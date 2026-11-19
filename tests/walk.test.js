@@ -95,17 +95,17 @@ async function startInApp(h) {
 test("a whole walk: start, turnaround alarm, countdown buzzes, silent end", async h => {
   await record(h);
   await h.load("bangturn.app.js");
-  assert.eq(screen(h), { time: "1:00:00", rows: ["Press to start"] }, "idle screen");
+  assert.eq(screen(h), { time: "60:00", rows: ["Press to start"] }, "idle screen");
   assert.eq(widget(h), 0, "no widget when idle");
   assert(!gpsOn(h), "GPS off when idle");
 
-  // Start: one short buzz, six entries, GPS on, widget showing 60
+  // Start: one short buzz, six entries, GPS on, widget hidden in the app
   await startInApp(h);
   assert.eq(buzzes(h), [100], "start buzz");
   assert.eq(state(h).turned, false);
   assert.eq(ids(h), ["turn"].concat(COUNTDOWN, ["end"]));
   assert(gpsOn(h), "GPS on");
-  assert.eq(widget(h), 28, "widget shows");
+  assert.eq(widget(h), 0, "widget hidden inside the app (shown on the clock, see ui tests)");
   assert.eq(screen(h).rows, ["Out -- kph"], "no speed before a fix");
 
   // Walk out at 5 kph for 10 min of GPS time
@@ -171,7 +171,7 @@ test("a whole walk: start, turnaround alarm, countdown buzzes, silent end", asyn
 
   // The app is back to idle
   await h.load("bangturn.app.js");
-  assert.eq(screen(h).time, "1:00:00");
+  assert.eq(screen(h).time, "60:00");
   assert.eq(widget(h), 0, "widget hidden");
 });
 
@@ -223,7 +223,7 @@ test("cancel from the menu mid-walk stops everything", async h => {
   assert.eq(speeds(h), { out: null, back: null });
   assert(h.eval("EV").includes("cancel"));
   assert.eq(h.eval("screen"), "main");
-  assert.eq(screen(h), { time: "1:00:00", rows: ["Press to start"] });
+  assert.eq(screen(h), { time: "60:00", rows: ["Press to start"] });
   assert.eq(widget(h), 0, "widget hidden");
   clearLog(h);
   await h.wait(4500);
@@ -292,7 +292,7 @@ test("watch off past the end: the walk ends quietly at the next boot", async h =
   assert.eq(buzzes(h), [], "no late alarm or buzz");
   assert(file(h) != "bangturn.app.js", "app not opened");
   await h.load("bangturn.app.js");
-  assert.eq(screen(h).time, "1:00:00", "idle");
+  assert.eq(screen(h).time, "60:00", "idle");
 });
 
 test("watch off across the turnaround: late alarm at boot, missed buzz skipped", async h => {

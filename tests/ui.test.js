@@ -45,15 +45,15 @@ function press(h) {
   h.tx(`WATCHES[WATCHES.length-1]({state:false,time:getTime(),lastTime:getTime()-0.1})`);
 }
 
-test("idle screen: 1:00:00, time of day, press to start", async h => {
+test("idle screen: 60:00, time of day, press to start", async h => {
   await h.load("bangturn.app.js");
-  assert.eq(screenText(h), { time: "1:00:00", rows: ["Press to start"] });
+  assert.eq(screenText(h), { time: "60:00", rows: ["Press to start"] });
   assert.eq(h.eval("screen"), "main");
   h.tx('Bangle.setLocked(false)');
   spyDraw(h);
   h.tx('Bangle.emit("lock",false)');
   const drawn = h.eval("DRAWN");
-  for (const s of ["1:00:00", "Press to start"])
+  for (const s of ["60:00", "Press to start"])
     assert(drawn.includes(s), `drew "${s}": ${JSON.stringify(drawn)}`);
   assert(drawn.some(s => /^\d\d:\d\d:\d\d$/.test(s)), "drew the time with seconds: " + JSON.stringify(drawn));
   assert(!drawn.some(s => s.indexOf("Turn around") >= 0), "no turnaround line");
@@ -90,7 +90,7 @@ test("running out: countdown, time of day and start time, Out row", async h => {
   h.tx(`${BT}.start(${now - 12 * MIN})`);
   await h.load("bangturn.app.js");
   const t = screenText(h);
-  assert(t.time == "0:48:00" || t.time == "0:47:59" || t.time == "0:47:58", "time " + t.time);
+  assert(t.time == "48:00" || t.time == "47:59" || t.time == "47:58", "time " + t.time);
   assert.eq(t.start, "Start " + hm(h, now - 12 * MIN));
   assert.eq(t.rows, ["Out -- kph"], "no fix yet");
   h.tx('Bangle.setLocked(false)');
@@ -100,6 +100,41 @@ test("running out: countdown, time of day and start time, Out row", async h => {
   assert(drawn.includes(t.start), "drew the start time: " + JSON.stringify(drawn));
   assert(drawn.some(s => /^\d\d:\d\d:\d\d$/.test(s)), "drew the time with seconds: " + JSON.stringify(drawn));
   assert(!drawn.some(s => s.indexOf("Turn around") >= 0), "no turnaround line");
+});
+
+test("countdown shows whole minutes left while locked", async h => {
+  h.tx(`${BT}.start(${h.eval("Date.now()") - 12 * MIN - 20000})`);
+  await h.load("bangturn.app.js");
+  h.tx("Bangle.setLocked(false)");
+  assert(/^47:[34]\d$/.test(screenText(h).time), "unlocked: m:ss " + screenText(h).time);
+  h.tx("Bangle.setLocked(true)");
+  assert.eq(screenText(h).time, "48 min", "rounded up, like the widget");
+  spyDraw(h);
+  h.tx('Bangle.emit("lock",true)');
+  assert(h.eval("DRAWN").includes("48 min"), "drew it");
+});
+
+test("swipe right goes back to the clock, the walk keeps running", async h => {
+  h.tx(`${BT}.start(${h.eval("Date.now()") - 5 * MIN})`);
+  await h.load("bangturn.app.js");
+  h.tx('Bangle.emit("swipe",-1,0)');
+  await h.wait(300);
+  assert.eq(h.eval("global.__FILE__"), "bangturn.app.js", "swipe left does nothing");
+  h.tx('global.LOADING=1;Bangle.emit("swipe",1,0)');
+  for (let i = 0; i < 100 && h.eval("global.LOADING!==undefined"); i++) await h.wait(20);
+  await h.wait(100);
+  assert(h.eval("global.__FILE__") != "bangturn.app.js", "left the app: " + h.eval("global.__FILE__"));
+  assert(h.eval(`${BT}.isActive()`), "walk still running");
+});
+
+test("minutes-left widget is hidden inside the app", async h => {
+  h.tx(`${BT}.start(${h.eval("Date.now()") - 5 * MIN})`);
+  await h.load();
+  assert.eq(h.eval("WIDGETS.bangturn.width"), 28, "shown on the clock");
+  await h.load("bangturn.app.js");
+  assert.eq(h.eval("WIDGETS.bangturn.width"), 0, "hidden in the app");
+  h.tx('Bangle.emit("bangturn","offset")');
+  assert.eq(h.eval("WIDGETS.bangturn.width"), 0, "stays hidden after an event");
 });
 
 test("running back: Out and Back speed rows", async h => {
@@ -131,14 +166,14 @@ test("redraws every second when unlocked, every minute when locked", async h => 
   h.tx('Bangle.setLocked(false);Bangle.emit("lock",false)');
   spyDraw(h);
   await h.wait(2600);
-  const unlocked = h.eval('DRAWN.filter(function(s){return s.indexOf("0:")==0}).length');
+  const unlocked = h.eval('DRAWN.filter(function(s){return /^\\d+:\\d\\d$/.test(s)}).length');
   assert(unlocked >= 2 && unlocked <= 4, "unlocked redraws in 2.6 s: " + unlocked);
   h.tx('Bangle.setLocked(true);Bangle.emit("lock",true)');
   await h.wait(300); // the lock change itself redraws once
   assert(h.eval("Bangle.isLocked()"), "locked");
   h.tx("DRAWN=[]");
   await h.wait(2600);
-  assert.eq(h.eval('DRAWN.filter(function(s){return s.indexOf("0:")==0}).length'), 0, "no redraw while locked");
+  assert.eq(h.eval('DRAWN.filter(function(s){return / min$/.test(s)}).length'), 0, "no redraw while locked");
   const next = h.eval("drawTimer&&global['\\xff'].timers[drawTimer].time/1000");
   assert(next > 1000 && next <= 60000, "next redraw on the minute: " + next);
 });
@@ -195,7 +230,7 @@ test("-1 min shows the offset and stays in the menu", async h => {
   assert.eq(h.eval(`${BT}.read().offset`), 3);
   h.tx('MENU["Resume"]()');
   const t = screenText(h);
-  assert(t.time == "0:52:00" || t.time == "0:51:59" || t.time == "0:51:58", "time " + t.time);
+  assert(t.time == "52:00" || t.time == "51:59" || t.time == "51:58", "time " + t.time);
   assert.eq(t.start, "Start " + hm(h, now - 8 * MIN), "start time moved 3 min earlier");
 });
 
@@ -230,7 +265,7 @@ test("Cancel walk clears the walk and shows the idle screen", async h => {
   assert.eq(h.eval("screen"), "main");
   assert.eq(h.eval(`${BT}.read()`), {});
   assert.eq(h.eval(`${BT}.getSched()`), []);
-  assert.eq(screenText(h), { time: "1:00:00", rows: ["Press to start"] });
+  assert.eq(screenText(h), { time: "60:00", rows: ["Press to start"] });
 });
 
 test("menu returns to the countdown after 10 s without input", async h => {

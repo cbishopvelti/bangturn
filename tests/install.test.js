@@ -59,5 +59,5 @@ test("the Web IDE installer replaces an old install and opens cleanly", async h 
   assert.eq(h.eval('require("Storage").read("bangturn.app.js")'), f.content, "new app.js");
   assert(h.eval('require("Storage").readJSON("bangturn.info",1).version') == meta.version, "launcher entry");
   await h.load("bangturn.app.js");
-  assert.eq(h.eval('lines(require("bangturn").status()).time'), "1:00:00", "app runs");
+  assert.eq(h.eval('lines(require("bangturn").status()).time'), "60:00", "app runs");
 });
