@@ -12,6 +12,7 @@
 */
 const fs = require("fs");
 const path = require("path");
+const installer = require("../tools/install");
 
 const BANGLE_DIR = process.env.BANGLE_DIR || "/opt/bangle";
 const APPS = path.join(BANGLE_DIR, "BangleApps");
@@ -27,24 +28,11 @@ function check() {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-/* Code that writes `content` to Storage file `name`, in chunks so the
-   console line buffer never gets too long. */
-function writeFileCmds(name, content) {
-  const CHUNK = 512;
-  if (!content.length) return `require("Storage").write(${JSON.stringify(name)},"");\n`;
-  let out = "";
-  for (let i = 0; i < content.length; i += CHUNK) {
-    const part = JSON.stringify(content.substr(i, CHUNK));
-    out += i == 0
-      ? `require("Storage").write(${JSON.stringify(name)},${part},0,${content.length});\n`
-      : `require("Storage").write(${JSON.stringify(name)},${part},${i});\n`;
-  }
-  return out;
-}
-
-/* Files to install: BangTurn per metadata.json, plus the latest sched lib
-   from BangleApps (the firmware image bundles an older copy). */
-function installFiles() {
+/* Files to install besides BangTurn itself: a test-only boot file and the
+   latest sched lib from BangleApps (the firmware image bundles an older
+   copy). BangTurn is installed with the same code as the Web IDE
+   installer (tools/install.js), straight from metadata.json. */
+function extraFiles() {
   // Test-only boot code (runs first): the emulator has no GPS, so record who
   // asked for GPS power in GPS_USERS, e.g. GPS_USERS.bangturn == 1.
   const files = [{ name: "0test.boot.js", content:
@@ -55,12 +43,6 @@ function installFiles() {
   for (const s of sched.storage)
     if (["sched", "sched.boot.js", "sched.js"].includes(s.name))
       files.push({ name: s.name, content: fs.readFileSync(path.join(APPS, "apps/sched", s.url), "utf8") });
-  const meta = JSON.parse(fs.readFileSync(path.join(ROOT, "metadata.json")));
-  for (const s of meta.storage) {
-    const content = fs.readFileSync(path.join(ROOT, s.url), "utf8");
-    if (/[^\x00-\x7f]/.test(content)) throw new Error(`${s.url} has non-ASCII characters`);
-    files.push({ name: s.name, content, evaluate: s.evaluate });
-  }
   return files;
 }
 
@@ -106,7 +88,8 @@ async function create(opts) {
     await h.wait(100);
   };
 
-  const files = installFiles();
+  const lines = extraFiles().map(installer.fileCmds).concat(installer.installCode(ROOT))
+    .join("").split("\n").filter(l => l);
   h.reset = async () => {
     // A fresh emulator per test: restoring flash under a running emulator
     // leaves Storage's file cache stale and corrupts later writes.
@@ -116,10 +99,7 @@ async function create(opts) {
     h.errors.length = 0;
     // skip the first-boot welcome app
     h.tx(`require("Storage").writeJSON("welcome.json",{welcomed:true})`);
-    for (const f of files) {
-      if (f.evaluate) h.tx(`require("Storage").write(${JSON.stringify(f.name)},${f.content.trim()})`);
-      else emu.tx("\x10" + writeFileCmds(f.name, f.content));
-    }
+    for (const l of lines) h.tx(l);
     h.tx(`require("Storage").writeJSON("sched.json",[])`);
     // load() rebuilds .boot0 (the .js hash changed) and runs boot code, like a reboot
     await h.load();

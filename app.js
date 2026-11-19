@@ -46,6 +46,7 @@ function lines(st) {
   return L;
 }
 
+/* Draws the main screen; returns the status it drew */
 function draw() {
   var st = bt.status();
   var L = lines(st);
@@ -59,7 +60,7 @@ function draw() {
     fit(r, 22, w);
     g.drawString(r, x, y + 88 + i * 24);
   });
-  if (!st.active) return;
+  if (!st.active) return st;
   // progress bar of the whole walk, with a notch at the turnaround
   var bx = R.x + 6, bw = R.w - 12, by = R.y2 - 16, bh = 12;
   g.drawRect(bx, by, bx + bw - 1, by + bh - 1);
@@ -69,16 +70,21 @@ function draw() {
   g.setColor(st.elapsed >= bt.TURN ? g.theme.bg : g.theme.fg)
     .drawLine(tx, by - 3, tx, by + bh + 2);
   g.setColor(g.theme.fg).drawLine(tx, by - 3, tx, by - 1).drawLine(tx, by + bh, tx, by + bh + 2);
+  return st;
 }
 
-/* Redraw now, then every second while unlocked, every minute while locked */
+/* Redraw now, then every second while unlocked, every minute while locked.
+   Timed to when the countdown's seconds (or minutes) change, like the
+   widget, so no number is skipped or shown twice. Idle: nothing changes,
+   so no timer (a "bangturn" event redraws on start). */
 function tick() {
   if (drawTimer) clearTimeout(drawTimer);
   drawTimer = undefined;
   if (screen != "main") return;
-  draw();
+  var st = draw();
+  if (!st.active) return;
   var period = Bangle.isLocked() ? 60000 : 1000;
-  drawTimer = setTimeout(tick, period - (Date.now() % period));
+  drawTimer = setTimeout(tick, (st.remaining % period || period) + 20);
 }
 
 function stopMenuTimer() {

@@ -1,1 +1,1 @@
-0.01: First version: timer core, sched entries, stub UI/alerts/GPS/widget
+0.01: First release: one-hour walk timer on sched, turnaround alarm at 30 min, walk-back countdown buzzes, GPS average speed (Out and Back) and a minutes-left widget

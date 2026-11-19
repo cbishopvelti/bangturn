@@ -212,13 +212,16 @@ exports.minusOne = function (now) {
    - "turn": marks the walk turned, flags the alert and loads the app, which
      shows it via require("bangturn.alerts").turnaround(). Emits "turn".
    - "left15".."left1": require("bangturn.alerts").countdown(n) in place,
-     whatever app is open. Emits "buzz".
-   - "end": finish() (silent). Emits "end". */
+     whatever app is open. Emits "buzz". Skipped if over a minute late.
+   - "end": finish() (silent). Emits "end". So does any entry that fires
+     after the walk's hour is up. */
 exports.fire = function (id) {
   var s = exports.read();
   // drop this entry (and any other already-past ones) and re-arm sched
   if (!exports.isActive(s)) return exports.clearSched();
-  if (id == "end") return exports.finish();
+  // "end", or any entry that fires once the walk's hour is up (the watch
+  // was off or busy past the end): finish silently, no late alarm or buzz
+  if (id == "end" || exports.status(undefined, s).remaining <= 0) return exports.finish();
   if (id == "turn") s.turned = true;
   exports.schedule(Date.now() + 1000, s);
   if (id == "turn") {
@@ -228,11 +231,20 @@ exports.fire = function (id) {
     load("bangturn.app.js");
     return;
   }
-  if (BUZZES[id]) {
+  if (BUZZES[id] && !late(id, s)) {
     emit("buzz");
     require("bangturn.alerts").countdown(BUZZES[id]);
   }
 };
+
+/* A countdown buzz more than LATE after its time (sched catching up after
+   the watch was off) would give the wrong count of minutes left, so it is
+   skipped. The turnaround alarm still shows when late. */
+var LATE = MIN;
+function late(id, s) {
+  var e = EVENTS.filter(function (e) { return e[0] == id; })[0];
+  return Date.now() - (exports.startTime(s) + e[1]) > LATE;
+}
 
 /* For the app at startup: returns the pending alert ("turn") and clears it,
    or undefined if there is none. */

@@ -12,10 +12,10 @@ colliding. The behaviour itself is in [spec.md](spec.md).
 | `app.js` | `bangturn.app.js` | Screens and menu | UI |
 | `app-icon.js`, `app.png` | `bangturn.img` | Icon | UI |
 | `alerts.js` | `bangturn.alerts` (module) | Start buzz, turnaround alarm, countdown buzzes | alerts |
-| `boot.js` | `bangturn.boot.js` | Starts the speed module when a walk is running | GPS speed |
+| `boot.js` | `bangturn.boot.js` | Starts the speed module when a walk is running; ends a walk whose hour ran out while the watch was off | GPS speed |
 | `speed.js` | `bangturn.speed` (module) | GPS power, distance tracking in the background, average speeds for the UI | GPS speed |
 | `widget.js` | `bangturn.wid.js` | Minutes-left widget | widget |
-| `metadata.json`, `tests/harness.js`, `tests/run.js` | | App loader metadata, test harness | core (add your storage entries and tests freely) |
+| `metadata.json`, `tests/harness.js`, `tests/run.js`, `tools/install.js` | | App loader metadata, test harness, Web IDE installer | core (add your storage entries and tests freely) |
 
 Each task owns its files. Stubs are in place and already work end to end
 (a plain countdown, simple buzzes, GPS on/off, a minutes widget), so every
@@ -106,6 +106,17 @@ entry that fired and re-arms `sched`. Because the state and entries are in
 Storage, a reboot or leaving the app loses nothing: `sched`'s boot code
 re-arms the next entry. Other apps' alarms are never touched.
 
+If the watch was off (or flat) when entries were due, `sched` fires the
+earliest overdue one about a second after boot, and `fire()` reschedules,
+dropping the rest that have passed. So after a reboot:
+
+- a missed turnaround still shows its alarm, late;
+- a countdown buzz more than a minute late is skipped (its count of
+  minutes left would be wrong);
+- once the walk's hour is up, any entry (or `bangturn.boot.js`, if no
+  entry is left for today) finishes the walk silently, rather than leaving
+  it at `0:00:00`.
+
 ## Startup alert hook (UI and alerts)
 
 The turnaround alarm opens the app. The app **must** start like this (it
@@ -134,7 +145,8 @@ watch); the app sets its own UI again in `done()`. Timings are in
 
 `boot.js` runs on every app load, so it is tiny. When no walk is running it
 reads `bangturn.json` and does nothing else (no module is loaded). During a
-walk it calls `require("bangturn.speed").resume(state)`, and it passes every
+walk it calls `require("bangturn.speed").resume(state)` (or, if the walk's
+hour ran out while the watch was off, `require("bangturn").finish()`), and it passes every
 `"bangturn"` event to `require("bangturn.speed").event(type)`. Everything
 else is in the speed module, which the app shares, so the app always sees
 the live numbers.
@@ -186,5 +198,13 @@ since it loads in every app.
 (set up with `tests/setup-emulator.sh`, see [tests/README.md](../tests/README.md)).
 Each test gets a fresh emulator with the app installed and boot code run.
 Add your own `tests/<area>.test.js` rather than editing `core.test.js`.
+`tests/walk.test.js` runs whole walks through every part together (start,
+alarm, buzzes, end, -1 min, cancel, reboots), and `tests/install.test.js`
+checks `metadata.json` and the Web IDE installer.
+
+`tools/install.js` turns `metadata.json` into the code that writes the files
+to Storage (plus the `bangturn.info` launcher entry the App Loader would
+write). The harness installs the app with it, and `npm run bundle` saves it
+as `dist/bangturn-install.js` for the Web IDE.
 Keep all source ASCII (the harness rejects anything else), so write `-1 min`
 with a plain hyphen.

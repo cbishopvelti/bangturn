@@ -15,3 +15,8 @@ jobs:
           node-version: 22
       - run: sh tests/setup-emulator.sh
       - run: npm test
+      - run: npm run bundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bangturn-install
+          path: dist/bangturn-install.js
