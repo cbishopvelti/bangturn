@@ -34,7 +34,7 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 
 ## Speed
 
-- Average speed in **kph**, one decimal place, measured with **GPS** (proposed; step-count estimate is the alternative).
+- Average speed in **kph**, one decimal place, measured with **GPS**.
 - First 30 min: one row, `Out 5.2 kph`, the average since the start.
 - At the turnaround that value freezes, and a second row appears: `Back 4.9 kph`, the average since the turnaround, updated as you walk.
 - Average = distance covered / time elapsed in that half. Distance is the sum of GPS fix-to-fix distances, ignoring fixes with poor accuracy (HDOP too high) and jumps that imply more than ~15 kph.
