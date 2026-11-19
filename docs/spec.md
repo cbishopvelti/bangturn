@@ -1,6 +1,6 @@
 # BangTurn: turnaround timer for Bangle.js 2
 
-**Status:** v1.0 (2026-11-19)
+**Status:** v1.1 (2026-11-19)
 
 ## Purpose
 
@@ -25,8 +25,8 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 | State | Screen | Button | Touch |
 |---|---|---|---|
 | Idle | `1:00:00`, "Turn around at 30:00" below, "Press to start" | Start | Tap: start |
-| Running | Big countdown of the whole walk (h:mm:ss), "Turn around at 30:00" under it until the turnaround, then "Heading home"; progress bar | Short press: opens a menu with **Resume** and **Cancel walk**. Long press: Bangle default (back to clock, walk keeps running) | Nothing |
-| Menu | List: Resume, Cancel walk | Selects | Tap an item. Resume (or no input for 10 s) goes back to the countdown. Cancel walk clears both `sched` timers and returns to idle |
+| Running | Big countdown of the whole walk (h:mm:ss), "Turn around at 30:00" under it until the turnaround, then "Heading home"; progress bar | Short press: opens a menu with **Resume**, **−1 min** and **Cancel walk**. Long press: Bangle default (back to clock, walk keeps running) | Nothing |
+| Menu | List: Resume, −1 min (shows current offset, e.g. "−1 min (−3)"), Cancel walk | Selects | Tap an item. Resume (or no input for 10 s) goes back to the countdown. −1 min moves the start time 1 minute earlier per tap and stays in the menu. Cancel walk clears both `sched` timers and returns to idle |
 | Alert | "TURN AROUND", full-screen high contrast | Stops alarm | Tap: stops alarm |
 
 - High contrast, large digits: readable in sunlight on the memory LCD.
@@ -72,4 +72,5 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 - Fixed 1-hour walk, turnaround at 30 min, countdown shows the whole hour.
 - Prominent turnaround alarm; buzzes in Quiet Mode; stops on unlock or after 6 s.
 - No pre-warning buzz.
+- **−1 min** in the menu moves the walk's start time one minute earlier per tap (for when you forgot to press start straight away). The countdown drops by a minute and both `sched` timers are rescheduled. If this moves the turnaround into the past, no alarm fires and the screen switches to "Heading home"; if it moves the end into the past, the walk finishes.
 - Cancel via short button press, then Cancel walk in the menu. If the watch is locked, the first press may only wake the screen; a second press opens the menu.
