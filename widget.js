@@ -1,30 +1,44 @@
 /* BangTurn widget, installed as "bangturn.wid.js".
-   OWNED BY: widget task. Stub: shows the minutes left while a walk runs.
+   Shows the whole minutes left (rounded up) while a walk runs; width 0 and
+   no timers when idle. Redraws on "bangturn" events and once a minute,
+   aligned to the moment the displayed number changes, so it wakes the CPU
+   at most once a minute. Idle cost: one small Storage read at load.
    See docs/ARCHITECTURE.md. */
 (function () {
-  var W = 28, iv;
+  var W = 28, to;
   function active() {
     var s = require("Storage").readJSON("bangturn.json", 1);
-    return s && s.start !== undefined;
+    return !!(s && s.start !== undefined);
+  }
+  function tick() {
+    to = undefined;
+    var st = require("bangturn").status();
+    if (!st.active) return update();
+    WIDGETS.bangturn.draw(st);
+    /* next change of ceil(remaining/60000), +50 ms margin */
+    var ms = st.remaining % 60000;
+    to = setTimeout(tick, (ms || 60000) + 50);
   }
   function update() {
-    var on = active(), w = on ? W : 0;
-    if (iv) { clearInterval(iv); iv = undefined; }
-    if (on) iv = setInterval(function () { WIDGETS.bangturn.draw(); }, 60000);
-    if (WIDGETS.bangturn.width != w) {
-      WIDGETS.bangturn.width = w;
+    var on = active(), w = on ? W : 0, wd = WIDGETS.bangturn;
+    if (to) { clearTimeout(to); to = undefined; }
+    if (wd.width != w) {
+      wd.width = w;
       Bangle.drawWidgets();
-    } else WIDGETS.bangturn.draw();
+    }
+    if (on) tick();
   }
   WIDGETS.bangturn = {
     area: "tr",
     width: 0,
-    draw: function () {
-      if (!this.width) return;
-      var st = require("bangturn").status();
+    draw: function (st) {
+      if (!this.width || this.x === undefined) return;
+      if (!st || st.remaining === undefined) st = require("bangturn").status();
+      if (!st.active) return;
+      var m = Math.ceil(st.remaining / 60000);
       g.reset().clearRect(this.x, this.y, this.x + W - 1, this.y + 23)
-        .setFontAlign(0, 0).setFont("6x8", 2)
-        .drawString(Math.ceil(st.remaining / 60000), this.x + W / 2, this.y + 12);
+        .setFontAlign(0, 0).setFont("6x8", m > 99 ? 1 : 2)
+        .drawString(m, this.x + W / 2, this.y + 12);
     }
   };
   Bangle.on("bangturn", update);
