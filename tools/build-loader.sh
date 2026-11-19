@@ -52,12 +52,12 @@ console.log("apps.json: " + apps.map(a => a.id + " " + a.version).join(", "));
 '
 : > appdates.csv
 
-# Open straight onto BangTurn.
+# Name the page after BangTurn. It lists both apps (BangTurn and the
+# Scheduler it needs), so the Library count matches what's shown.
 node -e '
 const fs = require("fs");
 let html = fs.readFileSync("index.html", "utf8");
 html = html.replace("<title>", "<title>BangTurn - ");
-html = html.replace("</head>", "<script>if(!location.search&&!location.hash)history.replaceState(null,\"\",\"?id=bangturn\");</script>\n</head>");
 fs.writeFileSync("index.html", html);
 '
 
