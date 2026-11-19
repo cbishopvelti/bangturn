@@ -6,9 +6,12 @@ const { test, assert } = require("./harness");
 const MIN = 60000;
 const BT = 'require("bangturn")';
 
-/* Replace the speed module with one that returns global.SP */
-function fakeSpeed(h) {
-  h.tx('require("Storage").write("bangturn.speed","exports.get=function(){return global.SP||{out:null,back:null}}")');
+/* Replace the speed module with one that returns global.SP from get().
+   resume() and event() are what bangturn.boot.js calls during a walk. */
+var FAKE_SPEED = "exports.resume=exports.event=function(){};exports.get=function(){GET}";
+function fakeSpeed(h, get) {
+  var src = FAKE_SPEED.replace("GET", get === undefined ? "return global.SP||{out:null,back:null}" : get);
+  h.tx(`require("Storage").write("bangturn.speed",${JSON.stringify(src)})`);
 }
 /* What the main screen shows right now */
 function screenText(h) {
@@ -74,7 +77,7 @@ test("running back: Heading home with Out and Back speed rows", async h => {
 });
 
 test("speed hook returning nothing still draws", async h => {
-  h.tx('require("Storage").write("bangturn.speed","exports.get=function(){}")');
+  fakeSpeed(h, "");
   h.tx(`${BT}.start(${h.eval("Date.now()") - 5 * MIN})`);
   await h.load("bangturn.app.js");
   assert.eq(screenText(h).rows, ["Out -- kph"]);
