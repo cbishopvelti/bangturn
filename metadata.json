@@ -9,6 +9,8 @@
   "tags": "outdoors,timer,gps",
   "supports": ["BANGLEJS2"],
   "readme": "README.md",
+  "author": "cbishopvelti",
+  "allow_emulator": true,
   "dependencies": { "scheduler": "type" },
   "storage": [
     { "name": "bangturn.app.js", "url": "app.js" },

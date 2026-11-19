@@ -49,5 +49,11 @@ test("what it checks", async h => {
   Feed fixes with `Bangle.emit("GPS", {fix:1, lat:.., lon:.., hdop:1, time:new Date(..)})`,
   at most a few dozen per `h.tx` (events are queued). The speed tracker
   measures time with `fix.time`, so a test can walk for half an hour in a
-  moment; `tests/gps.test.js` has a `walker` helper for that.
+  moment; `tests/walker.js` is a helper for that.
+- `tests/walk.test.js` moves a whole walk forward in time with `jump()`
+  (it shifts the walk's offset, as -1 min does) and lets sched fire for real.
+  It presses the button by running the firmware's BTN1 watches.
+- `E.reboot()` works: Storage survives and the boot code runs again, but the
+  emulator doesn't then open the clock (and the clock started at boot has no
+  `__FILE__`), so follow it with `h.load()`.
 - An uncaught error on the watch fails the test.
