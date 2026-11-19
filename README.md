@@ -18,7 +18,15 @@ minutes left in other apps. Press the button during a walk for **Resume**,
 BangTurn needs the Scheduler (`sched`) app. It's one of the default apps, and
 the App Loader installs it for you if it's missing.
 
-**App Loader (easiest).** Download this repository (Code, then Download ZIP)
+**One click (easiest).** Open
+[cbishopvelti.github.io/bangturn](https://cbishopvelti.github.io/bangturn/) in
+Chrome or Edge, press **Connect**, pick the watch and press the install
+(or update) button on BangTurn. It's the normal Bangle.js App Loader with only
+BangTurn and Scheduler on it, rebuilt from main on every push by
+[`.github/workflows/pages.yml`](.github/workflows/pages.yml)
+(`sh tools/build-loader.sh` builds the same thing locally into `_site/`).
+
+**App Loader from files.** Download this repository (Code, then Download ZIP)
 and unzip it. Open the [App Loader](https://banglejs.com/apps/) in Chrome or
 Edge and connect to the watch. On the **More...** tab, press **Install App from
 Files** and select every file in the folder (it only takes the ones
