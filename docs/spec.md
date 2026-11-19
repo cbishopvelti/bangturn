@@ -30,7 +30,7 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 | Alert | "TURN AROUND", full-screen high contrast | Stops alarm | Tap: stops alarm |
 
 - High contrast, large digits: readable in sunlight on the memory LCD.
-- A small widget shows the remaining minutes on the clock and other apps while a timer is running. It is hidden inside BangTurn itself, which shows the countdown.
+- A small widget, to the left of the battery, shows the remaining minutes (rounded down, the same minutes as the countdown's `m:ss`) on the clock and other apps while a timer is running. It is hidden inside BangTurn itself, which shows the countdown.
 
 ## Speed
 

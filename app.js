@@ -57,7 +57,7 @@ function lines(st, now) {
   // locked redraws once a minute, so drop the seconds that would freeze:
   // full is the whole m:ss (for layout), time what is drawn ("47" of "47:30")
   var full = bt.fmt(st.remaining);
-  var L = { full: full, time: st.active && locked ? full.split(":")[0] : full, rows: [] };
+  var L = { full: full, time: st.active && locked ? "" + bt.mins(st.remaining) : full, rows: [] };
   L.now = hms(now, !locked);
   if (st.active) L.start = "Start " + hms(bt.startTime(), true);
   if (!st.active) L.rows.push("Press to start");
@@ -128,7 +128,7 @@ function tick() {
   var period = Bangle.isLocked() ? 60000 : 1000;
   clockTimer = setTimeout(clockTick, period - (Date.now() % period) + 20);
   if (!st.active) return;
-  drawTimer = setTimeout(tick, (st.remaining % period || period) + 20);
+  drawTimer = setTimeout(tick, (period == 1000 ? st.remaining % 1000 || 1000 : bt.untilMins(st.remaining)) + 20);
 }
 function clockTick() {
   clockTimer = undefined;
