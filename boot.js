@@ -1,15 +1,13 @@
-/* BangTurn boot code, installed as "bangturn.boot.js" (runs every time an
-   app loads, so keep it tiny and cheap when no walk is active).
-   OWNED BY: GPS speed task. Stub: only switches GPS power with the walk.
-   Fill in fix filtering and distance tracking into bangturn.gps.json.
-   See docs/ARCHITECTURE.md. */
+/* BangTurn boot code, installed as "bangturn.boot.js". It runs every time
+   an app loads, so it is tiny: when no walk is running it reads
+   bangturn.json and does nothing else. During a walk it hands over to the
+   "bangturn.speed" module, which keeps GPS on and tracks the distance in
+   the background, whatever app is open. See docs/ARCHITECTURE.md.
+   OWNED BY: GPS speed task. */
 (function () {
-  function on() { Bangle.setGPSPower(1, "bangturn"); }
-  function off() { Bangle.setGPSPower(0, "bangturn"); }
   Bangle.on("bangturn", function (type) {
-    if (type == "start") on();
-    else if (type == "end" || type == "cancel") off();
+    require("bangturn.speed").event(type);
   });
   var s = require("Storage").readJSON("bangturn.json", 1);
-  if (s && s.start !== undefined) on();
+  if (s && s.start !== undefined) require("bangturn.speed").resume(s);
 })();

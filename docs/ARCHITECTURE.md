@@ -12,8 +12,8 @@ colliding. The behaviour itself is in [spec.md](spec.md).
 | `app.js` | `bangturn.app.js` | Screens and menu | UI |
 | `app-icon.js`, `app.png` | `bangturn.img` | Icon | UI |
 | `alerts.js` | `bangturn.alerts` (module) | Start buzz, turnaround alarm, countdown buzzes | alerts |
-| `boot.js` | `bangturn.boot.js` | GPS power and speed tracking in the background | GPS speed |
-| `speed.js` | `bangturn.speed` (module) | Average speeds for the UI | GPS speed |
+| `boot.js` | `bangturn.boot.js` | Starts the speed module when a walk is running | GPS speed |
+| `speed.js` | `bangturn.speed` (module) | GPS power, distance tracking in the background, average speeds for the UI | GPS speed |
 | `widget.js` | `bangturn.wid.js` | Minutes-left widget | widget |
 | `metadata.json`, `tests/harness.js`, `tests/run.js` | | App loader metadata, test harness | core (add your storage entries and tests freely) |
 
@@ -28,7 +28,7 @@ Data files:
 | File | Contents | Written by |
 |---|---|---|
 | `bangturn.json` | Walk state (below) | `lib.js` only |
-| `bangturn.gps.json` | `{outKm, outMs, backKm, backMs}`: distance and GPS time for each half | `boot.js` only |
+| `bangturn.gps.json` | `{start, outKm, outMs, backKm, backMs, ...}`: distance and GPS time for each half, plus where tracking had got to | `speed.js` only |
 | `sched.json` | Six entries with ids `bangturn.*` | `lib.js` only, through the `sched` module |
 
 ## Walk state: `bangturn.json`
@@ -132,17 +132,46 @@ watch); the app sets its own UI again in `done()`. Timings are in
 
 ## Speed: `bangturn.boot.js` and `require("bangturn.speed")`
 
-`boot.js` runs on every app load. Keep it cheap when no walk is running (it
-reads `bangturn.json` and does nothing else). During a walk it keeps GPS
-on (`Bangle.setGPSPower(1, "bangturn")`) and tracks distance into
-`bangturn.gps.json`. It turns GPS off on the `"end"` and `"cancel"` events.
-Use `require("bangturn").status().phase` (or `turned`) to decide which half
-a fix belongs to; `-1 min` can move the turnaround, and an `"offset"` event
-says when.
+`boot.js` runs on every app load, so it is tiny. When no walk is running it
+reads `bangturn.json` and does nothing else (no module is loaded). During a
+walk it calls `require("bangturn.speed").resume(state)`, and it passes every
+`"bangturn"` event to `require("bangturn.speed").event(type)`. Everything
+else is in the speed module, which the app shares, so the app always sees
+the live numbers.
 
-`require("bangturn.speed").get()` returns `{out, back}` in kph (numbers) or
-`null` where there's no value yet. `out` freezes at the turnaround; `back`
-is `null` until then. The UI only uses this function.
+For the UI:
+
+| Function | Does |
+|---|---|
+| `get()` | `{out, back}` in kph (numbers), or `null` where there's no value yet. `out` freezes at the turnaround; `back` is `null` until then. A half has no value until GPS has tracked it for 10 s. |
+| `fmt(kph)` | `"5.2 kph"`, or `"-- kph"` for `null`. Use this rather than `toFixed(1)`, which doesn't carry in Espruino (`4.96` gives `"4.9"`). |
+| `stats()` | `{outKm, outMs, backKm, backMs, tracking}`: the distance and tracked time behind the speeds (for tests and debugging) |
+
+So the rows are `"Out " + speed.fmt(v.out)` and, on the walk back,
+`"Back " + speed.fmt(v.back)`, with `v = speed.get()`. Calling `get()` every
+second is fine: it only reads RAM.
+
+How it tracks:
+
+- GPS power is `Bangle.setGPSPower(1, "bangturn")` from the `"start"` event
+  (or from boot, if a walk is running) until `"end"` or `"cancel"`. As a
+  safety net it also turns GPS off by itself once the walk's hour is up, and
+  boot doesn't turn it on for a walk whose time has passed.
+- A fix counts if it has a position and an HDOP of 5 or better. A fix that
+  implies more than 15 kph since the last good one is a jump and is ignored;
+  after 5 jumps in a row tracking restarts from the new position, leaving
+  out the gap.
+- Distance is added in straight steps of at least 10 m, so jitter adds next
+  to nothing. Time is the time between good fixes by the GPS clock
+  (`fix.time`), so neither the wait for the first fix nor `-1 min` changes
+  the average. A gap with no fixes is bridged in a straight line.
+- Which half a fix belongs to follows the core's clock: `back` once
+  `Date.now()` is `TURN` past the effective start. `-1 min` can move that,
+  and the `"offset"` event tells the module.
+- The state lives in RAM. It is saved to `bangturn.gps.json` on the `"kill"`
+  event (every app change) and at most once a minute, and read back by
+  `resume()`. A crash or hard reboot carries on from the last save. The file
+  is tagged with the walk's `start` and erased on `"end"` and `"cancel"`.
 
 ## Widget: `bangturn.wid.js`
 

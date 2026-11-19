@@ -25,8 +25,12 @@ function fit(txt, max, w) {
   return s;
 }
 
+/* "5.2 kph", or "-- kph" before there is a speed. Not toFixed(1):
+   Espruino's doesn't carry, so 4.96 would show as 4.9. */
 function kph(v) {
-  return (typeof v == "number" && isFinite(v) ? v.toFixed(1) : "--") + " kph";
+  if (typeof v != "number" || !isFinite(v)) return "-- kph";
+  var n = Math.round(v * 10);
+  return Math.floor(n / 10) + "." + (n % 10) + " kph";
 }
 
 /* What the main screen shows, as plain data (also used by the tests) */

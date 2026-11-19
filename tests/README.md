@@ -46,4 +46,8 @@ test("what it checks", async h => {
   events a second or two away.
 - There's no GPS in the emulator. `GPS_USERS` records who asked for GPS power
   (`GPS_USERS.bangturn == 1` while BangTurn has it on).
+  Feed fixes with `Bangle.emit("GPS", {fix:1, lat:.., lon:.., hdop:1, time:new Date(..)})`,
+  at most a few dozen per `h.tx` (events are queued). The speed tracker
+  measures time with `fix.time`, so a test can walk for half an hour in a
+  moment; `tests/gps.test.js` has a `walker` helper for that.
 - An uncaught error on the watch fails the test.
