@@ -95,6 +95,16 @@ exports.fmt = function (ms) {
   return Math.floor(t / 60) + ":" + ("0" + t % 60).substr(-2);
 };
 
+/* Whole minutes of the countdown, rounded down: the "47" of "47:30" (the
+   minutes fmt() shows), so the widget and the locked app agree. */
+exports.mins = function (ms) {
+  return Math.floor(Math.ceil(Math.max(0, ms) / 1000) / 60);
+};
+/* ms until mins(ms) next changes (when fmt() goes from m:00 to m-1:59) */
+exports.untilMins = function (ms) {
+  return ms - (exports.mins(ms) * 60 - 1) * 1000;
+};
+
 /* ---------- sched entries ---------- */
 
 function isOurs(a) {

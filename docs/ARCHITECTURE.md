@@ -56,7 +56,8 @@ Constants: `DURATION` (3600000, the only place the walk length lives),
 | Function | Does |
 |---|---|
 | `status(now?)` | `{active, phase, elapsed, remaining, toTurn, offset, turned, start}`. `phase` is `"idle"`, `"out"` or `"back"`. Times are ms, never negative. Use this for all drawing. |
-| `fmt(ms)` | `"1:00:00"` (h:mm:ss, rounds up to the second) |
+| `fmt(ms)` | `"60:00"` (m:ss, no hours, rounds up to the second) |
+| `mins(ms)` / `untilMins(ms)` | The minutes of `fmt(ms)` (`47` for `47:30`, rounded down), used by the widget and the locked app; and ms until they change |
 | `isActive()` | A walk is running |
 | `read()` | The raw state object |
 | `start()` | Starts a walk now, writes the six `sched` entries. Doesn't buzz: the app calls `alerts.started()`. |

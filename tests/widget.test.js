@@ -22,7 +22,7 @@ test("appears on start, shows minutes left, hides on cancel", async h => {
   h.tx(`${BT}.start(Date.now()-10*${MIN}-1000)`);
   assert.eq(width(h), 28);
   h.tx(`global.DR=[];var _d=g.drawString;g.drawString=function(s){DR.push(s);return _d.apply(g,arguments)};WIDGETS.bangturn.draw()`);
-  assert.eq(h.eval("DR[DR.length-1]"), 50);
+  assert.eq(h.eval("DR[DR.length-1]"), 49, "49:59 left: rounded down like the countdown");
   h.tx(`${BT}.cancel()`);
   assert.eq(width(h), 0);
 });
@@ -37,11 +37,13 @@ test("shows on load when a walk is already running, hides at end", async h => {
 });
 
 test("minute tick redraws when the number changes", async h => {
-  h.tx(`${BT}.start(Date.now()-20*${MIN}-58800)`); // 40 -> 39 in ~1.2 s
+  h.tx(`${BT}.start(Date.now()-20*${MIN}-59800)`); // 39:00.2 left: 39 -> 38 in ~1.2 s
   setup(h);
   h.tx(`global.DR=[];var _d=g.drawString;g.drawString=function(s){DR.push(s);return _d.apply(g,arguments)}`);
-  await h.wait(1800);
+  h.tx("WIDGETS.bangturn.draw()");
   assert.eq(h.eval("DR[DR.length-1]"), 39);
+  await h.wait(1800);
+  assert.eq(h.eval("DR[DR.length-1]"), 38, "changes with the countdown's 39:00 -> 38:59");
 });
 
 test("-1 min updates the number", async h => {
@@ -49,5 +51,13 @@ test("-1 min updates the number", async h => {
   h.tx(`${BT}.start(Date.now()-5*${MIN}-1000)`);
   h.tx(`global.DR=[];var _d=g.drawString;g.drawString=function(s){DR.push(s);return _d.apply(g,arguments)}`);
   h.tx(`${BT}.minusOne()`);
-  assert.eq(h.eval("DR[DR.length-1]"), 54);
+  assert.eq(h.eval("DR[DR.length-1]"), 53, "53:59 left");
+});
+
+test("sits to the left of the battery", async h => {
+  h.tx(`${BT}.start(Date.now()-5*${MIN})`);
+  setup(h);
+  const x = h.eval("[WIDGETS.bangturn.x,WIDGETS.bat&&WIDGETS.bat.x]");
+  assert(x[1] !== null, "battery widget present");
+  assert(x[0] < x[1], "bangturn x " + x[0] + " < battery x " + x[1]);
 });

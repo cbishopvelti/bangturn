@@ -42,6 +42,9 @@ test("idle status and h:mm:ss formatting", async h => {
   assert.eq(h.eval(`${BT}.fmt(${BT}.TURN)`), "30:00");
   assert.eq(h.eval(`${BT}.fmt(61500)`), "1:02");
   assert.eq(h.eval(`${BT}.fmt(-5)`), "0:00");
+  // mins(): the minutes of fmt(), and when they next change
+  assert.eq(h.eval(`[${BT}.mins(3600000),${BT}.mins(3599500),${BT}.mins(3599000),${BT}.mins(90000),${BT}.mins(59500),${BT}.mins(59000)]`), [60, 60, 59, 1, 1, 0]);
+  assert.eq(h.eval(`[${BT}.untilMins(3600000),${BT}.untilMins(3599500),${BT}.untilMins(2850000)]`), [1000, 500, 31000]);
   assert.eq(h.eval(`${BT}.getSched()`), []);
 });
 
