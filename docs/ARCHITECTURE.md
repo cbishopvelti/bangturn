@@ -140,7 +140,12 @@ else showMain();
 All alerts buzz at full strength and in Quiet Mode: they call `Bangle.buzz`
 directly and never read the `quiet` setting. While the turnaround alarm
 shows, it owns the UI (`Bangle.setUI` custom, plus a one-shot `BTN1`
-watch); the app sets its own UI again in `done()`. Timings are in
+watch); the app sets its own UI again in `done()`.
+Buzzing can read as a twist or tap on the accelerometer, which unlocks a
+Bangle.js 2, so while any alert buzzes `wakeOnTwist`, `wakeOnDoubleTap` and
+`wakeOnFaceUp` are off (restored 500 ms after the last buzz, or by boot code
+on `load()`). A countdown also re-locks a watch that was locked if it
+unlocks mid-buzz anyway. Timings are in
 `require("bangturn.alerts").T`.
 
 ## Speed: `bangturn.boot.js` and `require("bangturn.speed")`
