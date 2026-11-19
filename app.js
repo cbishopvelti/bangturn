@@ -2,8 +2,9 @@
    OWNED BY: UI task. Screens and menu from docs/spec.md "UI":
    - idle:    60:00, time of day, "Press to start"
    - running: small row with the time of day and the walk's start time,
-              big m:ss countdown of the whole walk ("48 min" while
-              locked), average speed rows, progress bar
+              big m:ss countdown of the whole walk (just the minutes,
+              in the same place, while locked), average speed rows,
+              progress bar
    Swipe right goes back to the clock. The minutes-left widget is hidden.
    - menu:    Resume, -1 min (offset shown), Cancel walk; back to the
               countdown after 10 s with no input
@@ -48,15 +49,17 @@ function hms(t, secs) {
 /* What the main screen shows, as plain data (also used by the tests).
    now: time of day, with seconds only while unlocked (locked redraws once
    a minute, so seconds would be stale). start: the walk's start time,
-   moved earlier by any -1 min taps. */
+   moved earlier by any -1 min taps, always with seconds (it's fixed, so
+   they never go stale). */
 function lines(st, now) {
   if (now === undefined) now = Date.now();
   var locked = Bangle.isLocked();
-  // locked redraws once a minute, so show whole minutes left (rounded up,
-  // like the widget) instead of seconds that would freeze
-  var L = { time: st.active && locked ? Math.ceil(st.remaining / 60000) + " min" : bt.fmt(st.remaining), rows: [] };
+  // locked redraws once a minute, so drop the seconds that would freeze:
+  // full is the whole m:ss (for layout), time what is drawn ("47" of "47:30")
+  var full = bt.fmt(st.remaining);
+  var L = { full: full, time: st.active && locked ? full.split(":")[0] : full, rows: [] };
   L.now = hms(now, !locked);
-  if (st.active) L.start = "Start " + hms(bt.startTime());
+  if (st.active) L.start = "Start " + hms(bt.startTime(), true);
   if (!st.active) L.rows.push("Press to start");
   else {
     var sp = speed.get() || {};
@@ -89,8 +92,11 @@ function draw() {
   var L = lines(st);
   var R = Bangle.appRect, x = R.x + R.w / 2, w = R.w - 4, y = R.y;
   g.reset().clearRect(R).setFontAlign(0, 0);
-  fit(L.time, 46, w);
-  g.drawString(L.time, x, y + 48);
+  // sized and placed as the full m:ss, so the minutes don't move when the
+  // seconds are left off
+  fit(L.full, 46, w);
+  g.setFontAlign(-1, 0).drawString(L.time, x - g.stringWidth(L.full) / 2, y + 48);
+  g.setFontAlign(0, 0);
   drawClock(L);
   L.rows.forEach(function (r, i) {
     fit(r, 22, w);

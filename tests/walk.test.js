@@ -41,6 +41,7 @@ const screen = h => {
   const L = h.eval(`lines(${BT}.status())`);
   delete L.now;
   delete L.start;
+  delete L.full;
   return L;
 };
 const widget = h => h.eval("WIDGETS.bangturn.width");
