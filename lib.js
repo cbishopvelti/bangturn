@@ -87,12 +87,12 @@ exports.status = function (now, s) {
   };
 };
 
-/* "1:00:00" style h:mm:ss for a duration in ms (rounded up to the second,
-   so a countdown shows 1:00:00 at the start and 0:00:00 only at the end). */
+/* "60:00" style m:ss (whole minutes, no hours) for a duration in ms,
+   rounded up to the second, so a countdown shows 60:00 at the start and
+   0:00 only at the end. */
 exports.fmt = function (ms) {
   var t = Math.ceil(Math.max(0, ms) / 1000);
-  var h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, sec = t % 60;
-  return h + ":" + ("0" + m).substr(-2) + ":" + ("0" + sec).substr(-2);
+  return Math.floor(t / 60) + ":" + ("0" + t % 60).substr(-2);
 };
 
 /* ---------- sched entries ---------- */

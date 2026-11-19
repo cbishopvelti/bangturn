@@ -38,10 +38,10 @@ function gpsOn(h) {
 test("idle status and h:mm:ss formatting", async h => {
   const st = h.eval(`${BT}.status()`);
   assert.eq([st.active, st.phase, st.remaining], [false, "idle", DUR]);
-  assert.eq(h.eval(`${BT}.fmt(${BT}.DURATION)`), "1:00:00");
-  assert.eq(h.eval(`${BT}.fmt(${BT}.TURN)`), "0:30:00");
-  assert.eq(h.eval(`${BT}.fmt(61500)`), "0:01:02");
-  assert.eq(h.eval(`${BT}.fmt(-5)`), "0:00:00");
+  assert.eq(h.eval(`${BT}.fmt(${BT}.DURATION)`), "60:00");
+  assert.eq(h.eval(`${BT}.fmt(${BT}.TURN)`), "30:00");
+  assert.eq(h.eval(`${BT}.fmt(61500)`), "1:02");
+  assert.eq(h.eval(`${BT}.fmt(-5)`), "0:00");
   assert.eq(h.eval(`${BT}.getSched()`), []);
 });
 
