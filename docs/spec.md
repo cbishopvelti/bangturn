@@ -1,6 +1,6 @@
 # BangTurn: turnaround timer for Bangle.js 2
 
-**Status:** v1.2 (2026-11-19)
+**Status:** v1.3 (2026-11-19)
 
 ## Purpose
 
@@ -13,7 +13,7 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 3. You can leave the app and go back to the clock. The timer keeps running in the background.
 4. When the countdown reaches 30 minutes left, the watch vibrates with a distinct pattern and shows **TURN AROUND**.
 5. The alarm stops as soon as the watch unlocks (you raise your wrist to look, press the button or tap), or after 6 seconds, whichever comes first.
-6. The countdown carries on for the walk back. At zero the watch gives a gentler "walk done" buzz and returns to the idle screen.
+6. The countdown carries on for the walk back, with short countdown buzzes at 15, 8, 4 and 1 minutes left. At zero the watch gives a "walk done" buzz and returns to the idle screen.
 
 ## Duration
 
@@ -26,7 +26,7 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 |---|---|---|---|
 | Idle | `1:00:00`, "Turn around at 30:00" below, "Press to start" | Start | Tap: start |
 | Running | Big countdown of the whole walk (h:mm:ss), "Turn around at 30:00" under it until the turnaround, then "Heading home"; average speed row(s) in kph (see Speed); progress bar | Short press: opens a menu with **Resume**, **−1 min** and **Cancel walk**. Long press: Bangle default (back to clock, walk keeps running) | Nothing |
-| Menu | List: Resume, −1 min (shows current offset, e.g. "−1 min (−3)"), Cancel walk | Selects | Tap an item. Resume (or no input for 10 s) goes back to the countdown. −1 min moves the start time 1 minute earlier per tap and stays in the menu. Cancel walk clears both `sched` timers and returns to idle |
+| Menu | List: Resume, −1 min (shows current offset, e.g. "−1 min (−3)"), Cancel walk | Selects | Tap an item. Resume (or no input for 10 s) goes back to the countdown. −1 min moves the start time 1 minute earlier per tap and stays in the menu. Cancel walk clears all BangTurn `sched` timers and returns to idle |
 | Alert | "TURN AROUND", full-screen high contrast | Stops alarm | Tap: stops alarm |
 
 - High contrast, large digits: readable in sunlight on the memory LCD.
@@ -44,7 +44,13 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 ## Alerts
 
 - Start confirmation: one short buzz (~100 ms).
-- Walk done (countdown hits zero): two short buzzes, no repeats.
+- Home-stretch countdown (walk back only), short buzzes (~200 ms on, 300 ms off) so you can count them without looking:
+  - 15 min left: 1 buzz
+  - 8 min left: 2 buzzes
+  - 4 min left: 3 buzzes
+  - 1 min left: 4 buzzes
+- Walk done (countdown hits zero): one long buzz (~1 s), so it can't be mistaken for a countdown buzz. No repeats.
+- Countdown and walk-done buzzes also play in Quiet Mode.
 - Turnaround alarm: distinct and prominent. A continuous pattern of long full-strength buzzes (e.g. 600 ms on, 200 ms off), unlike any notification buzz, with the screen lit.
 - It stops when the watch unlocks (Bangle `lock` event fires with `false`, i.e. you looked at it or touched it) or after **6 seconds**, whichever comes first. No repeats.
 - **Buzzes in Quiet Mode**, since this alarm is the whole point of the app.
@@ -52,7 +58,7 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 ## Background behaviour
 
 - Use the built-in **`sched`** library (the same one the Alarm and Timer apps use) rather than an in-app `setTimeout`. That way the timer survives leaving the app, opening other apps, or the watch going back to the clock.
-- On start, BangTurn writes two timer entries to `sched` (turnaround at 30 min, walk done at 60 min), each with `js` pointing back to BangTurn, so the alert opens BangTurn wherever you are. The start time is saved in `bangturn.json` so the countdown can be redrawn after leaving and reopening the app.
+- On start, BangTurn writes six timer entries to `sched` (turnaround at 30 min; countdown buzzes at 45, 52, 56 and 59 min; walk done at 60 min), each with `js` pointing back to BangTurn, so the alert opens BangTurn wherever you are. The start time is saved in `bangturn.json` so the countdown can be redrawn after leaving and reopening the app.
 - Requires the **Scheduler** (`sched`) app as a dependency in `metadata.json`.
 - If the watch reboots mid-walk, `sched` restores the timer.
 
@@ -67,7 +73,7 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 
 - Turnaround by distance
 - Changing the walk length
-- A warning buzz before the turnaround
+- A warning buzz before the turnaround (the countdown buzzes are on the walk back only)
 - Logging walks or history
 - Phone app or Gadgetbridge integration
 
@@ -81,6 +87,7 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 
 - Fixed 1-hour walk, turnaround at 30 min, countdown shows the whole hour.
 - Prominent turnaround alarm; buzzes in Quiet Mode; stops on unlock or after 6 s.
-- No pre-warning buzz.
-- **−1 min** in the menu moves the walk's start time one minute earlier per tap (for when you forgot to press start straight away). The countdown drops by a minute and both `sched` timers are rescheduled. If this moves the turnaround into the past, no alarm fires and the screen switches to "Heading home"; if it moves the end into the past, the walk finishes.
+- No warning buzz before the turnaround.
+- Home-stretch countdown buzzes at 15/8/4/1 min left (1/2/3/4 buzzes).
+- **−1 min** in the menu moves the walk's start time one minute earlier per tap (for when you forgot to press start straight away). The countdown drops by a minute and all `sched` timers are rescheduled. Any buzz whose time has already passed is skipped: if this moves the turnaround into the past, no alarm fires and the screen switches to "Heading home"; if it moves the end into the past, the walk finishes.
 - Cancel via short button press, then Cancel walk in the menu. If the watch is locked, the first press may only wake the screen; a second press opens the menu.
