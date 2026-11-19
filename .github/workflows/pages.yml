@@ -25,6 +25,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history: the commit count is the build number
       - uses: actions/setup-node@v4
         with:
           node-version: 22
