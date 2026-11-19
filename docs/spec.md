@@ -1,6 +1,6 @@
 # BangTurn: turnaround timer for Bangle.js 2
 
-**Status:** v1.1 (2026-11-19)
+**Status:** v1.2 (2026-11-19)
 
 ## Purpose
 
@@ -25,12 +25,21 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 | State | Screen | Button | Touch |
 |---|---|---|---|
 | Idle | `1:00:00`, "Turn around at 30:00" below, "Press to start" | Start | Tap: start |
-| Running | Big countdown of the whole walk (h:mm:ss), "Turn around at 30:00" under it until the turnaround, then "Heading home"; progress bar | Short press: opens a menu with **Resume**, **−1 min** and **Cancel walk**. Long press: Bangle default (back to clock, walk keeps running) | Nothing |
+| Running | Big countdown of the whole walk (h:mm:ss), "Turn around at 30:00" under it until the turnaround, then "Heading home"; average speed row(s) in kph (see Speed); progress bar | Short press: opens a menu with **Resume**, **−1 min** and **Cancel walk**. Long press: Bangle default (back to clock, walk keeps running) | Nothing |
 | Menu | List: Resume, −1 min (shows current offset, e.g. "−1 min (−3)"), Cancel walk | Selects | Tap an item. Resume (or no input for 10 s) goes back to the countdown. −1 min moves the start time 1 minute earlier per tap and stays in the menu. Cancel walk clears both `sched` timers and returns to idle |
 | Alert | "TURN AROUND", full-screen high contrast | Stops alarm | Tap: stops alarm |
 
 - High contrast, large digits: readable in sunlight on the memory LCD.
 - A small widget shows the remaining minutes on the clock and other apps while a timer is running.
+
+## Speed
+
+- Average speed in **kph**, one decimal place, measured with **GPS** (proposed; step-count estimate is the alternative).
+- First 30 min: one row, `Out 5.2 kph`, the average since the start.
+- At the turnaround that value freezes, and a second row appears: `Back 4.9 kph`, the average since the turnaround, updated as you walk.
+- Average = distance covered / time elapsed in that half. Distance is the sum of GPS fix-to-fix distances, ignoring fixes with poor accuracy (HDOP too high) and jumps that imply more than ~15 kph.
+- Before the first fix the row shows `-- kph`. If you use −1 min, the speed still uses only the time GPS has been running, since there's no distance for the minutes before you pressed start.
+- GPS turns on when the walk starts and off when it ends or is cancelled.
 
 ## Alerts
 
@@ -49,13 +58,14 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 
 ## Battery
 
-- No GPS, no HRM, no Bluetooth use, so the drain is close to the clock's.
+- GPS is the main drain: on for the hour of the walk, roughly 10 to 20% of the battery per walk. No HRM or Bluetooth use.
+- GPS runs from a small boot/background handler so speed keeps being tracked when you leave the app.
 - Redraw the countdown once a second only while the screen is unlocked. When locked, redraw once a minute (or not at all and let the widget show minutes).
 - Nothing runs between ticks: the timer is a single `sched` wake-up, not a polling loop.
 
 ## Out of scope (v1)
 
-- GPS distance or turnaround by distance
+- Turnaround by distance
 - Changing the walk length
 - A warning buzz before the turnaround
 - Logging walks or history
@@ -63,7 +73,7 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 
 ## Implementation notes
 
-- Espruino JavaScript, standard BangleApps layout: `app.js`, `widget.js`, `metadata.json`, `app-icon.js`.
+- Espruino JavaScript, standard BangleApps layout: `app.js`, `widget.js`, `boot.js` (GPS tracking in the background), `metadata.json`, `app-icon.js`.
 - Test in the Espruino Web IDE emulator first, then on the watch.
 - Can be published to a personal fork of the BangleApps loader or uploaded directly via the Web IDE.
 
