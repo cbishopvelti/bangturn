@@ -9,7 +9,7 @@
      mins: the length to start on (minutes)
      done(mins): called once, with the chosen length, when the button or
      the back arrow is pressed. It doesn't save anything itself; the caller
-     does (require("bangturn").setMins). Used by app.js (swipe left on the
+     does (require("bangturn").setMins). Used by app.js (the button menu on the
      idle screen) and settings.js (Settings > Apps > BangTurn). */
 
 var ROW = 30;         // px between values on a wheel

@@ -9,7 +9,8 @@ countdown and your average speed out and back (GPS), and a widget shows the
 minutes left in other apps. Press the button during a walk for **Resume**,
 **-1 min** (if you started late) and **Cancel walk**.
 
-To change the walk length, swipe left on the idle screen (or go to Settings >
+To change the walk length, press the button on the idle screen and pick
+**Length** (or go to Settings >
 Apps > BangTurn) and drag the hours and minutes wheels. The countdown shows
 the total in minutes, so 1 h 30 starts at `90:00`. A new length applies to
 the next walk.

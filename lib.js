@@ -13,7 +13,7 @@ var APPID = "bangturn";
 var MIN = 60000;
 
 /* Walk length. The default is an hour; the user picks their own with the
-   duration picker (Settings > Apps > BangTurn, or swipe left on the idle
+   duration picker (Settings > Apps > BangTurn, or the button menu on the idle
    screen), saved in bangturn.settings.json as { mins }. Each walk keeps
    the length it was started with (`dur` in bangturn.json), so changing
    the setting during a walk only changes the next walk. */
