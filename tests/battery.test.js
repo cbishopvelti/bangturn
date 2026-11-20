@@ -95,7 +95,8 @@ test("the same in the app: it ends the walk and shows the idle screen", async h 
    turns the watch's own GPS off while they arrive. The emulator has no GPS,
    so 0hw.boot.js (run before android.boot.js) stands in for the firmware's
    Bangle.setGPSPower: the same per-app list in Bangle._PWR.GPS, with the
-   hardware state in global.GPS_HW. Messages to the phone go to GBOUT. */
+   hardware state in global.GPS_HW (and Bangle.getGPSFix() undefined while
+   it's off, like the firmware's). Messages to the phone go to GBOUT. */
 async function phoneGPS(h) {
   assert(fs.existsSync(path.join(APPS, "apps/android/lib.js")),
     "BangleApps/apps/android missing: run tests/setup-emulator.sh");
@@ -104,7 +105,8 @@ async function phoneGPS(h) {
   put("0hw.boot.js", "Bangle.setGPSPower=function(on,id){if(!Bangle._PWR)Bangle._PWR={};" +
     "var l=Bangle._PWR.GPS||(Bangle._PWR.GPS=[]);id=id===undefined?'?':''+id;var i=l.indexOf(id);" +
     "if(on){if(i<0)l.push(id)}else if(i>=0)l.splice(i,1);if(!l.length)delete Bangle._PWR.GPS;" +
-    "return global.GPS_HW=l.length>0};Bangle.isGPSOn=function(){return !!global.GPS_HW};\n");
+    "return global.GPS_HW=l.length>0};Bangle.isGPSOn=function(){return !!global.GPS_HW};" +
+    "Bangle.getGPSFix=function(){return global.GPS_HW?{fix:0}:undefined};\n");
   put("android", file("lib.js"));
   put("android.boot.js", file("boot.js"));
   h.tx(`require("Storage").writeJSON("android.settings.json",{overwriteGps:true})`);
@@ -127,6 +129,7 @@ test("phone GPS: the watch's GPS is off while the phone sends fixes; cancel turn
   await h.wait(100);
   assert.eq(hw(h), false, "watch GPS off while the phone sends fixes");
   assert.eq(h.eval(`require("bangturn.speed").stats().tracking`), true);
+  assert.eq(h.eval(`require("bangturn.speed").source()`), { from: "phone", chip: false }, "what the menu shows");
   h.tx(`${BT}.cancel()`);
   await h.wait(100);
   assert.eq(hw(h), false, "watch GPS off");
@@ -154,6 +157,7 @@ test("phone GPS: if the phone stops sending, the watch's GPS takes over and stil
   phoneFix(h);
   await h.wait(2500); // fixes 1 s apart, so the android app gives up after 2 s
   assert.eq(hw(h), true, "watch GPS back on (the android app's fallback)");
+  assert.eq(h.eval(`require("bangturn.speed").source().chip`), true, "the menu shows the chip on");
   await h.wait(3000);
   assert.eq(h.eval(`${BT}.isActive()`), false, "walk ended");
   assert.eq(hw(h), false, "watch GPS off at the end");

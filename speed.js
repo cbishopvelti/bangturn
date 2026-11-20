@@ -52,6 +52,7 @@ var tracking = false;
 var dirty = false;  // S has changed since it was saved
 var saved;          // fix time of the last save
 var endTimer;       // fires just after the walk's end (see armEnd)
+var src, srcAt;     // where the last GPS event came from ("phone"/"watch"), and when
 
 function save() {
   if (!dirty || !S) return;
@@ -126,6 +127,10 @@ function restart(f, t, gt) {
 function onGPS(f) {
   var bt = require("bangturn");
   var el = Date.now() - T0;
+  // Gadgetbridge's fixes (Android Integration, "Overwrite GPS") are marked
+  // externalSource; the watch's own GPS sends an event a second, fix or not
+  src = f.externalSource ? "phone" : "watch";
+  srcAt = Date.now();
   // The walk is over. The core's "end" follows, but never leave GPS on.
   if (el >= DUR) return stop();
   if (!f.fix || isNaN(f.lat) || isNaN(f.lon) || f.hdop > HDOP_MAX) return;
@@ -235,4 +240,17 @@ exports.fmt = function (kph) {
   if (typeof kph != "number" || isNaN(kph)) return "-- kph";
   var n = Math.round(kph * 10);
   return Math.floor(n / 10) + "." + (n % 10) + " kph";
+};
+
+/* Where GPS is coming from, for the walk menu, so you can check on the
+   watch that the phone is supplying it:
+   { from: "phone"|"watch"|null (no GPS event in the last SRC_MS),
+     chip: true while the watch's own GPS chip is powered }.
+   chip asks the firmware (Bangle.getGPSFix() is undefined when the chip is
+   off), not Bangle.isGPSOn(), which Android Integration replaces with
+   "has any app asked for GPS" when it overwrites GPS. */
+var SRC_MS = 30000;
+exports.source = function () {
+  var fresh = srcAt !== undefined && Date.now() - srcAt < SRC_MS;
+  return { from: fresh ? src : null, chip: Bangle.getGPSFix() !== undefined };
 };

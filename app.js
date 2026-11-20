@@ -7,7 +7,8 @@
               in the same place, while locked), average speed rows,
               progress bar
    Swipe right goes back to the clock. The minutes-left widget is hidden.
-   - menu:    Resume, -1 min (offset shown), Cancel walk; back to the
+   - menu:    Resume, -1 min (offset shown), Cancel walk, then GPS via
+              (phone/watch) and Watch GPS (the chip on/off); back to the
               countdown after 10 s with no input
    Keep the startup alert hook at the bottom (see docs/ARCHITECTURE.md). */
 var bt = require("bangturn");
@@ -207,6 +208,11 @@ function showWalkMenu(selected) {
     if (bt.isActive()) showWalkMenu(1); else showMain();
   };
   menu["Cancel walk"] = function () { bt.cancel(); showMain(); };
+  // where the speeds' GPS comes from, and whether the watch's own GPS chip
+  // (the big battery drain) is on; tap either to refresh
+  var src = speed.source();
+  menu["GPS via"] = { value: src.from || "none yet", onchange: function () { showWalkMenu(3); } };
+  menu["Watch GPS"] = { value: src.chip ? "ON" : "off", onchange: function () { showWalkMenu(4); } };
   E.showMenu(menu);
   startMenuTimer();
 }
