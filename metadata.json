@@ -26,6 +26,7 @@
   "data": [
     { "name": "bangturn.json" },
     { "name": "bangturn.gps.json" },
+    { "name": "bangturn.trail" },
     { "name": "bangturn.settings.json" }
   ]
 }

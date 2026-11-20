@@ -7,7 +7,7 @@
    entries and tells everything listening (the "offset" event, as -1 min
    does). sched then fires the next event in real time, a second or two
    later. The GPS clock is the walker's own (tests/walker.js). */
-const { test, assert } = require("./harness");
+const { test, assert, speedRows } = require("./harness");
 const walker = require("./walker");
 
 const MIN = 60000;
@@ -42,10 +42,11 @@ const screen = h => {
   delete L.now; delete L.nowFull; delete L.dim; delete L.timeDim;
   delete L.start;
   delete L.full;
+  L.rows = speedRows(L.rows);
   return L;
 };
 const widget = h => h.eval("WIDGETS.bangturn.width");
-const speeds = h => h.eval(`${SP}.get()`);
+const speeds = h => h.eval(`(function(v){return {out:v.out,back:v.back}})(${SP}.get())`);
 /* the inverted TURN AROUND screen is showing */
 const alarmShowing = h =>
   h.eval("g.getPixel(4,4)==g.toColor(g.theme.fg) && g.getPixel(4,4)!=g.toColor(g.theme.bg)");
@@ -361,6 +362,8 @@ test("BangTurn stays small: memory in the background and in the app", async h =>
   w.walk(5, 300);
   await h.wait(200);
   const clockWalk = used();
-  assert(clockWalk - clockIdle < 0.08 * total, `background cost ${clockWalk - clockIdle} of ${total} vars`);
+  // most of it is the speed module: its code, and the trail home (64 points
+  // to start with, 512 at most, 8 bytes a point)
+  assert(clockWalk - clockIdle < 0.11 * total, `background cost ${clockWalk - clockIdle} of ${total} vars`);
   assert(app < 0.2 * total, `app uses ${app} of ${total} vars`);
 });

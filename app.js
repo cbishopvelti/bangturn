@@ -4,10 +4,12 @@
               no swipe for the length (another app on the watch uses swipes).
               The button never starts a walk (it's pressed just to get
               around): it opens the idle menu (Length, the picker); a tap starts
-   - running: small row with the time of day and the walk's start time,
-              big m:ss countdown of the whole walk (just the minutes,
-              in the same place, while locked), average speed rows,
-              progress bar
+   - running: two lines at the top with the time of day and the walk's
+              start time, big m:ss countdown of the whole walk (just the
+              minutes, in the same place, while locked), average speed
+              rows, each with the time to the origin at that speed, a row
+              with the speed needed to be back at 0, the speed now and the
+              difference between them
    Swipe right goes back to the clock. The minutes-left widget is hidden.
    - menu:    (idle: Length, Info, Units; the button goes back)
               during a walk: Resume, -1 min (offset shown), Cancel walk,
@@ -41,13 +43,46 @@ function fit(txt, max, w) {
    the Units menu item, so drawing doesn't read Storage every second */
 var units = bt.getUnits();
 
-/* "5.2 kph" (or "3.2 mph"), or "-- kph" before there is a speed. v is in
-   kph. Not toFixed(1): Espruino's doesn't carry, so 4.96 would show as 4.9. */
+/* "5.2" (v is in kph: "3.2" with the units set to mph), or "--" before
+   there is a speed ("99+" from 100, which is only ever the speed needed in
+   the last seconds). The units are drawn after it, small (drawRows). Not
+   toFixed(1): Espruino's doesn't carry, so 4.96 would show as 4.9. */
 function kph(v) {
-  if (typeof v != "number" || !isFinite(v)) return "-- " + units;
+  if (typeof v != "number" || !isFinite(v) || v < 0) return "--";
   var n = Math.round(bt.toUnits(v, units) * 10);
-  return Math.floor(n / 10) + "." + (n % 10) + " " + units;
+  return n >= 1000 ? "99+" : Math.floor(n / 10) + "." + (n % 10);
 }
+
+/* The colour of the speed now and of its difference from the speed needed,
+   from lines()'s c: green on the speed needed, shading to red as you fall
+   BAND (a share of the speed needed: 20%) behind it, and to the normal
+   text colour (black on the light theme) as you get BAND ahead. The
+   screen has 8 colours, so the shades in between are dithered by the
+   firmware. */
+var BAND = 0.2;
+function nowColour(c) {
+  if (c === undefined) return g.theme.fg;
+  if (c <= 0) return g.toColor(-c, 1 + c, 0);
+  return g.theme.dark ? g.toColor(c, 1, c) : g.toColor(0, 1 - c, 0);
+}
+
+/* The speed now less the speed needed (both in kph), as shown: "-0.3" when
+   0.3 too slow, "+0.4" when faster than needed, "0.0" on it. From the two
+   numbers as rounded on screen (so in the units setting), so the three
+   always add up. */
+function diff(now, need) {
+  var n = Math.round(bt.toUnits(now, units) * 10) - Math.round(bt.toUnits(need, units) * 10), m = Math.abs(n);
+  return (n > 0 ? "+" : n < 0 ? "-" : "") + (m >= 1000 ? "99+" : Math.floor(m / 10) + "." + (m % 10));
+}
+
+/* Time to walk `km` at speed `v`, as m:ss like the countdown ("--" when
+   there is no distance or speed yet, the speed is 0, or it's over 999 min) */
+function tto(km, v) {
+  if (typeof km != "number" || typeof v != "number" || !(v > 0)) return "--";
+  var ms = km * 3600000 / v;
+  return ms < 60000000 ? bt.fmt(ms) : "--";
+}
+
 /* The Units item of both button menus: a tap switches kph <-> mph and
    redraws the menu (on the same item) */
 function unitsItem(menu, again, i) {
@@ -71,7 +106,20 @@ function hms(t, secs) {
    ":00" on each minute) and don't tick. The countdown does the same with
    time and timeDim (the lock, then ":59" as each minute starts).
    start: the walk's start time, moved earlier by any -1 min taps, always with seconds (it's fixed, so
-   they never go stale). */
+   they never go stale).
+   rows: strings when idle. During a walk, objects (drawn in columns):
+   - {a:"Out"|"Back", v, tf, t, td}: the half's average speed v, and tf, the
+     time to the origin at that speed along the trail home
+     (speed.get().home). t is the part of it drawn in the text colour and td
+     the part drawn grey: like the countdown, the seconds are grey while
+     locked.
+   - {a:"Now", v, w, d, c}: v is the speed over the last few seconds, w the
+     speed needed (the one that covers the way home in the time left on the
+     countdown) and d the difference, v less w, with its sign ("-0.3" is
+     0.3 kph too slow; "--" when either is unknown). c is the same
+     comparison for the colour of v and d (see nowColour): 0 on the speed needed, down
+     to -1 for BAND (20% of the speed needed) or more too slow, up to 1 for
+     BAND or more faster than needed; undefined when either is unknown. */
 function lines(st, now) {
   if (now === undefined) now = Date.now();
   var locked = Bangle.isLocked();
@@ -88,26 +136,47 @@ function lines(st, now) {
   if (!st.active) L.rows.push("Tap to start");
   else {
     var sp = speed.get() || {};
-    L.rows.push("Out " + kph(sp.out));
-    if (st.phase == "back") L.rows.push("Back " + kph(sp.back));
+    var row = function (a, v) {
+      var tf = tto(sp.home, v);
+      var i = locked ? tf.indexOf(":") : -1;
+      L.rows.push({ a: a, v: kph(v), tf: tf, t: i < 0 ? tf : tf.substr(0, i), td: i < 0 ? "" : tf.substr(i) });
+    };
+    row("Out", sp.out);
+    if (st.phase == "back") row("Back", sp.back);
+    var need = typeof sp.home == "number" && st.remaining > 0 ? sp.home * 3600000 / st.remaining : NaN;
+    var r = { a: "Now", v: kph(sp.now), w: kph(need), d: "--" };
+    if (r.v != "--" && r.w != "--") {
+      r.d = diff(sp.now, need);
+      // (never a band under 0.1, the smallest step shown: next to the
+      // origin the speed needed is all but 0)
+      var n = bt.toUnits(sp.now, units), m = bt.toUnits(need, units);
+      r.c = E.clip((n - m) / Math.max(BAND * m, 0.1), -1, 1);
+    }
+    L.rows.push(r);
   }
   return L;
 }
 
-/* The small row above the countdown: time of day, plus the start time
-   on the right during a walk */
+/* Above the countdown: the time of day. During a walk, two lines with
+   the times one above the other at the right:
+     [GPS symbol]   19:31:38
+     Start          18:50:28 */
+var TOP = 16; // how much lower the walk screen's countdown and rows are for the second line
 function drawClock(L) {
   var R = Bangle.appRect, y = R.y + 12;
-  g.reset().clearRect(R.x, y - 11, R.x2, y + 11);
+  g.reset();
   if (L.start) {
-    // during a walk the GPS symbol sits left of the time, which always
-    // starts just after it, so the time never moves
-    var hw = R.w / 2 - 4;
-    g.setFont("Vector", Math.min(fit(L.nowFull, 18, hw - ICON_W - 2), fit(L.start, 18, hw)));
-    drawNow(L, R.x + ICON_W + 4, y);
-    g.setFontAlign(1, 0).drawString(L.start, R.x2 - 3, y);
+    g.clearRect(R.x, R.y, R.x2, R.y + 39);
+    // sized and placed as the full HH:MM:SS, so HH:MM stays put whether
+    // the seconds are black or grey; the GPS symbol sits at the left and
+    // doesn't move it either
+    g.setFont("Vector", 20);
+    drawNow(L, R.x2 - 3 - g.stringWidth(L.nowFull), y - 1);
+    g.setFontAlign(1, 0).drawString(L.start.substr(6), R.x2 - 3, y + 18);
+    g.setFont("Vector", 15).setFontAlign(-1, 0).drawString("Start", R.x + 3, y + 19);
     drawIcon(gpsIcon());
   } else {
+    g.clearRect(R.x, y - 11, R.x2, y + 11);
     // sized and placed as the full HH:MM:SS, so HH:MM stays put whether
     // the seconds are black or grey
     fit(L.nowFull, 20, R.w - 4);
@@ -168,6 +237,56 @@ function onGPSIcon(f) {
   if (k != drawnIcon) drawIcon(k);
 }
 
+/* The bottom row: the speed needed after a target symbol, the speed now
+   after a speedometer, then the difference, both in the colour that says
+   how they compare (see nowColour), with the units ("kph" or "mph") once
+   for all three at the end:
+     (o) 5.2   (/) 4.9   -0.3 kph
+   The difference always has room for a sign, so nothing moves as it
+   passes 0.0. All three shrink together when one is long (10 kph or more). */
+var GAUGE = atob("DQqBAA+BgxAEgKgMwMYMMEFAEQEA"); // 13x10, 1 bit
+function drawGoal(r, y) {
+  var R = Bangle.appRect, x1 = R.x + 3, x2 = R.x2 - 3, IW = 16, s = 22;
+  var signed = r.d[0] == "-" || r.d[0] == "+", wide = "+" + (signed ? r.d.substr(1) : r.d);
+  g.setFont("Vector", 12).setFontAlign(1, 0).drawString(units, x2, y + 2);
+  var kw = g.stringWidth(units) + 2, ww, tot;
+  do {
+    g.setFont("Vector", --s);
+    ww = g.stringWidth(r.w);
+    tot = 2 * IW + ww + g.stringWidth(r.v) + g.stringWidth(wide) + kw;
+  } while (s > 10 && tot > x2 - x1 - 7);
+  var x = x1 + 6, gap = (x2 - x1 + 1 - tot) / 2;
+  g.drawCircle(x, y, 6).drawCircle(x, y, 3).fillRect(x, y, x, y); // the target
+  g.setFontAlign(-1, 0).drawString(r.w, x1 + IW, y);
+  x = Math.round(x1 + IW + ww + gap);
+  g.drawImage(GAUGE, x, y - 5).setColor(nowColour(r.c)).drawString(r.v, x + IW, y);
+  g.setFontAlign(1, 0).drawString(r.d, x2 - kw, y).setColor(g.theme.fg);
+}
+
+/* The walk's rows, in columns so the numbers line up and don't move:
+     Out   5.2 kph   28:45     label, average speed, time to the origin
+     Back  4.9 kph   31:02     (only on the way back, always in this place)
+     (o) 5.2  (/) 4.9  -0.3 kph   always the bottom row (see drawGoal)
+   Labels and units are small, the numbers big. The units are the Units
+   setting's: "mph" in place of "kph". */
+function drawRows(rows) {
+  var R = Bangle.appRect, y0 = R.y + 77 + TOP, x1 = R.x + 3, x2 = R.x2 - 3;
+  var NUM = 22, LBL = 15, SX = R.x + 76; // speeds end at SX
+  rows.forEach(function (r) {
+    var y = y0 + (r.d ? 2 : r.a == "Back" ? 1 : 0) * 22;
+    if (r.d) return drawGoal(r, y);
+    g.setFont("Vector", LBL).setFontAlign(-1, 0).drawString(r.a, x1, y + 1);
+    g.setFont("Vector", NUM).setFontAlign(1, 0).drawString(r.v, SX, y);
+    g.setFont("Vector", 12).setFontAlign(-1, 0).drawString(units, SX + 2, y + 2);
+    var kx = SX + 5 + g.stringWidth(units); // where the units end
+    // placed as the whole m:ss, so the minutes don't move when the
+    // seconds turn grey (smaller only for a time of 100 minutes or more)
+    fit(r.tf, NUM, x2 - kx - 1);
+    drawDim(r.t, r.td, x2 - g.stringWidth(r.tf), y);
+  });
+  g.setFontAlign(0, 0);
+}
+
 /* Draws the main screen; returns the status it drew */
 function draw(st) {
   st = st || bt.status();
@@ -176,25 +295,20 @@ function draw(st) {
   g.reset().clearRect(R).setFontAlign(0, 0);
   drawnIcon = undefined; // drawn again with the time row during a walk
   // sized and placed as the full m:ss, so the minutes don't move when the
-  // seconds turn grey
+  // seconds turn grey (a line lower during a walk: the start time is above
+  // it)
   fit(L.full, 46, w);
-  drawDim(L.time, L.timeDim, x - g.stringWidth(L.full) / 2, y + 48);
+  drawDim(L.time, L.timeDim, x - g.stringWidth(L.full) / 2, y + 48 + (st.active ? TOP : 0));
   g.setFontAlign(0, 0);
   drawClock(L);
-  L.rows.forEach(function (r, i) {
-    fit(r, 22, w);
-    g.drawString(r, x, y + 88 + i * 24);
-  });
-  if (!st.active) return st;
-  // progress bar of the whole walk, with a notch at the turnaround
-  var bx = R.x + 6, bw = R.w - 12, by = R.y2 - 16, bh = 12;
-  g.drawRect(bx, by, bx + bw - 1, by + bh - 1);
-  var fill = Math.round((bw - 4) * Math.min(1, st.elapsed / st.duration));
-  if (fill > 0) g.fillRect(bx + 2, by + 2, bx + 1 + fill, by + bh - 3);
-  var tx = bx + Math.round(bw * st.turn / st.duration);
-  g.setColor(st.elapsed >= st.turn ? g.theme.bg : g.theme.fg)
-    .drawLine(tx, by - 3, tx, by + bh + 2);
-  g.setColor(g.theme.fg).drawLine(tx, by - 3, tx, by - 1).drawLine(tx, by + bh, tx, by + bh + 2);
+  if (!st.active) {
+    L.rows.forEach(function (r, i) {
+      fit(r, 22, w);
+      g.drawString(r, x, y + 88 + i * 24);
+    });
+    return st;
+  }
+  drawRows(L.rows);
   return st;
 }
 

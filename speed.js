@@ -21,20 +21,47 @@
    - The Out numbers stop changing at the turnaround, at the last place GPS
      saw before it. Back starts from zero there.
 
+   The same good fixes feed two more things (docs/spec.md, "Way home"):
+   - The speed right now: the distance counted over the last NOW_MS.
+   - The trail home: a line of points CRUMB metres or so apart from where GPS first
+     saw you (the origin) to where you are, by the shortest way along the
+     path you have walked. Whenever you come within SNAP of an earlier part
+     of the trail, and going straight there is at least SAVED shorter than
+     the trail, the trail is cut back to that point. That one rule drops
+     loops and there-and-back detours on the way out, shortens the trail as
+     you retrace it on the way back (whenever you turn around), and handles
+     leaving the trail on the way back: a detour adds its own points, and
+     they are dropped when you rejoin the trail anywhere. The distance home
+     is the length of the trail plus the straight bit from its last point to
+     you.
+
    State is kept in RAM and saved to bangturn.gps.json when the app changes
    (the "kill" event) and at most once a minute, so a crash or hard reboot
-   loses nothing but the shape of the path since the last save. */
+   loses nothing but the shape of the path since the last save. The trail is
+   bigger, so it has its own file, bangturn.trail, written when the app
+   changes and every TRAIL_MS: after a crash the trail carries on in a
+   straight line from where it was last saved. */
 
 var FILE = "bangturn.gps.json";
+var TRAIL = "bangturn.trail"; // the trail's points: XY's bytes
 var HDOP_MAX = 5;     // fixes with a higher HDOP are ignored (about 25 m)
 var MAX_KPH = 15;     // faster than this between two fixes is a GPS jump
 var MIN_MOVE = 0.01;  // km: distance is counted in steps of at least 10 m
 var MAX_REJECT = 5;   // jumps in a row before restarting from the new position
 var MIN_MS = 10000;   // tracked time a half needs before it has an average
 var SAVE_MS = 60000;  // save to Storage at most this often
+var TRAIL_MS = 300000; // ...and the trail at most this often
 var END_MARGIN = 1500; // after the walk's end, GPS goes off by this (ms)
 var PHONE_FRESH = 120000; // the phone "was supplying GPS" if its last fix is newer (ms)
 var KM_PER_DEG = 111.195;
+var NOW_MS = 20000;   // the speed "now" is measured over the last 20 s of fixes
+var NOW_MIN = 5000;   // ...and needs at least 5 s of them
+var NOW_STALE = 15000; // ...and a good fix this recently (the watch's clock)
+var CRUMB = 10;       // m between the points of the trail home
+var SNAP = 25;        // m: this near an earlier point of the trail is back on it
+var SAVED = 12;       // m a cut must save, so a right-angle corner isn't one
+var SCAN = 5;         // m to move before the trail is looked through again
+var MAXC = 512;       // points kept: a longer trail is thinned to every other one
 
 /* Saved as bangturn.gps.json:
    { start,          the walk this belongs to (bangturn.json's start)
@@ -46,23 +73,40 @@ var KM_PER_DEG = 111.195;
      la, lo, lt,     position and time (ms) of the last good fix
      gt,             true if lt is GPS time, false if it is the watch's clock
      rej,            jumps in a row so far
-     ph }            when the phone last sent a fix (ms, the watch's clock) */
+     ph,             when the phone last sent a fix (ms, the watch's clock)
+     oa, oo,         the origin: where the trail home starts (lat, lon)
+     cd }            m between the trail's points now (CRUMB, doubled per thinning) */
 var S;
 var T0;             // effective start of the walk (ms, the watch's clock)
 var DUR;            // the walk's length (ms)
 var tracking = false;
 var dirty = false;  // S has changed since it was saved
 var saved;          // fix time of the last save
+var trailAt;        // ...and of the last save of the trail
 var endTimer;       // fires just after the walk's end (see armEnd)
 var src, srcAt;     // where the last GPS event came from ("phone"/"watch"), and when
 var fixAt;          // when the last GPS event with a position came (any HDOP)
+var H = [];         // samples of recent good fixes, oldest first: fix time, km counted so far, ...
+var hAt;            // when the last of them came (the watch's clock)
+/* The trail home, in RAM (saved as TRAIL). Points are whole metres east and
+   north of the origin, so the search is integer maths on flat arrays. */
+var XY;             // Int16Array: x0, y0, x1, y1, ...
+var C;              // Float32Array: m along the trail from the origin to each point
+var N = 0;          // points on the trail
+var KX;             // m per degree of longitude at the origin
+var px, py;         // where you are (the last good fix), in the trail's metres
+var sx, sy;         // where the trail was last looked through from
 var origMove;       // Android Integration's Bangle.moveGPSPower, while phoneFirst is in
 var holdTimer;      // pending: the watch's own GPS comes on unless the phone sends a fix
 
-function save() {
+/* Save the state. quick: leave the trail's file as it is. */
+function save(quick) {
   if (!dirty || !S) return;
   require("Storage").writeJSON(FILE, S);
   dirty = false;
+  if (quick === true || !N) return;
+  require("Storage").write(TRAIL, E.toString(new Uint8Array(XY.buffer, 0, N * 4)));
+  trailAt = S.lt;
 }
 
 function listen() {
@@ -179,6 +223,125 @@ function restart(f, t, gt) {
   S.gt = gt;
   S.rej = 0;
   dirty = true;
+  H = [];
+  mark(t);
+  trail(f.lat, f.lon);
+}
+
+/* Note the distance counted so far at fix time t, for the speed now: a
+   sample every 2 s at most (plenty for a 20 s average, and a short list),
+   kept for NOW_MS (and one older, so the span is at least NOW_MS). */
+function mark(t) {
+  hAt = Date.now();
+  var n = H.length;
+  if (n && t - H[n - 2] < 2000) return;
+  H.push(t, S.outKm + S.backKm + S.pk);
+  while (H.length > 4 && t - H[2] >= NOW_MS) H.splice(0, 2);
+}
+
+function hyp(dx, dy) { return Math.sqrt(dx * dx + dy * dy); }
+
+/* Set every point's distance along the trail. */
+function lengths() {
+  C[0] = 0;
+  for (var i = 1, j = 2; i < N; i++, j += 2) C[i] = C[i - 1] + hyp(XY[j] - XY[j - 2], XY[j + 1] - XY[j - 1]);
+}
+
+/* Room for at least n points (the arrays start small and double, so a
+   short walk costs little RAM), up to MAXC. */
+function room(n) {
+  n = Math.min(MAXC, Math.max(64, n));
+  var a = new Int16Array(2 * n), c = new Float32Array(n);
+  if (XY) {
+    a.set(XY);
+    c.set(C);
+  }
+  XY = a;
+  C = c;
+}
+
+/* Add a point to the end of the trail. A trail of MAXC points is thinned
+   first: every other point goes, and from then on points are twice as far
+   apart. */
+function push(x, y) {
+  if (!XY || 2 * N >= XY.length) {
+    if (N < MAXC) room(2 * N);
+    else {
+      for (var i = 0, n = 0; i < N; i += 2, n++) {
+        XY[2 * n] = XY[2 * i];
+        XY[2 * n + 1] = XY[2 * i + 1];
+      }
+      N = n;
+      S.cd *= 2;
+      lengths();
+      trailAt = undefined; // the file no longer matches cd: save it with the next save
+    }
+  }
+  XY[2 * N] = x;
+  XY[2 * N + 1] = y;
+  C[N] = N ? C[N - 1] + hyp(x - XY[2 * N - 2], y - XY[2 * N - 1]) : 0;
+  N++;
+}
+
+/* Of the points c-2 to c+2: cut the trail back to the first one that is
+   within the snap distance of (x, y) and a shorter way there than the trail
+   (`end` metres) by SAVED. Returns the distance from it, or -1 for no cut. */
+function cut(c, x, y, r2, end) {
+  for (var i = Math.max(0, c - 2), k = Math.min(N - 2, c + 2); i <= k; i++) {
+    var dx = x - XY[2 * i], dy = y - XY[2 * i + 1], d2 = dx * dx + dy * dy;
+    if (d2 < r2 && end - C[i] - Math.sqrt(d2) > SAVED) {
+      N = i + 1;
+      return Math.sqrt(d2);
+    }
+  }
+  return -1;
+}
+
+/* Look through the trail from (x, y), cut it if there's a shorter way, and
+   add points if (x, y) is far enough from its end. This is the only work
+   that grows with the walk, and Espruino reads a loop's text again on every
+   pass (even the parts it skips), so the inner loop is as short as it can
+   be, and it looks at every 4th point.
+   Neighbouring points are under 2 * cd apart, so if any point is within r,
+   a 4th point (at most two along) is within r + 4 * cd, and cut() looks at
+   the points around that one. The points are added in a straight line, cd
+   or a bit more apart: several after a gap in the fixes, so the way back
+   can be matched to that stretch too. */
+function scan(x, y) {
+  var a = XY, e = 2 * N - 2, cd = S.cd, r = Math.max(SNAP, 0.75 * cd);
+  var live = hyp(x - a[e], y - a[e + 1]), end = C[N - 1] + live;
+  var R2 = (r + 4 * cd) * (r + 4 * cd), d = -1, j = -8, dx, dy;
+  while (d < 0 && j < e) {
+    for (j += 8; j < e; j += 8) {
+      dx = x - a[j];
+      dy = y - a[j + 1];
+      if (dx * dx + dy * dy < R2) break;
+    }
+    if (j < e) d = cut(j >> 1, x, y, r * r, end);
+  }
+  if (d < 0) d = cut(N - 2, x, y, r * r, end); // the last few, which the step of 4 can miss
+  if (d >= 0) live = d;
+  if (live < cd) return;
+  var n = Math.floor(live / cd), ox = XY[2 * N - 2], oy = XY[2 * N - 1];
+  for (j = 1; j <= n; j++) push(Math.round(ox + (x - ox) * j / n), Math.round(oy + (y - oy) * j / n));
+}
+
+/* A good fix at (lat, lon): keep the trail home up to date (see the top of
+   the file). The first one is the origin. The trail is looked through once
+   per SCAN metres moved, not per fix: never while standing still. */
+function trail(lat, lon) {
+  if (S.oa === undefined) {
+    S.oa = lat;
+    S.oo = lon;
+    S.cd = CRUMB;
+    N = 0;
+    KX = undefined;
+  }
+  if (!KX) KX = 1000 * KM_PER_DEG * Math.cos(S.oa * Math.PI / 180);
+  var x = px = E.clip(Math.round((lon - S.oo) * KX), -32767, 32767);
+  var y = py = E.clip(Math.round((lat - S.oa) * 1000 * KM_PER_DEG), -32767, 32767);
+  if (!N) push(sx = 0, sy = 0); // the origin (the trail's file can be missing after a crash)
+  if (hyp(x - sx, y - sy) >= SCAN) scan(sx = x, sy = y);
 }
 
 function onGPS(f) {
@@ -220,9 +383,11 @@ function onGPS(f) {
   S.lt = t;
   S.rej = 0;
   dirty = true;
+  mark(t);
+  trail(f.lat, f.lon);
   if (t - saved >= SAVE_MS || t < saved) {
     saved = t;
-    save();
+    save(t - trailAt < TRAIL_MS);
   }
 }
 
@@ -237,6 +402,21 @@ function begin(s, fresh) {
   DUR = bt.duration(s);
   dirty = false;
   saved = undefined;
+  // the trail home, as it was saved; where you are is the last good fix
+  H = [];
+  N = 0;
+  XY = C = KX = trailAt = undefined;
+  var b = S === f && S.oa !== undefined && require("Storage").read(TRAIL);
+  if (b) {
+    N = b.length >> 2;
+    room(N + 32);
+    new Uint8Array(XY.buffer).set(E.toUint8Array(b));
+    lengths();
+    KX = 1000 * KM_PER_DEG * Math.cos(S.oa * Math.PI / 180);
+    px = sx = Math.round((S.lo - S.oo) * KX);
+    py = sy = Math.round((S.la - S.oa) * 1000 * KM_PER_DEG);
+    trailAt = S.lt;
+  } else if (S !== f) require("Storage").erase(TRAIL); // a new walk: a new trail
   if (Date.now() - T0 < DUR) listen();
   else stop();
 }
@@ -252,7 +432,11 @@ exports.event = function (type) {
     dirty = false; // nothing to keep
     stop();
     S = undefined;
+    H = [];
+    N = 0;
+    XY = C = undefined;
     require("Storage").erase(FILE);
+    require("Storage").erase(TRAIL);
     return;
   }
   var s = require("bangturn").read();
@@ -280,17 +464,59 @@ exports.stats = function () {
   return r;
 };
 
-/* Average speeds for the UI, in kph (numbers), or null before there is a
-   value: { out: kph|null, back: kph|null }.
+/* The speed right now in kph: the distance counted between the fixes of
+   the last NOW_MS (the same 10 m steps as the averages, so jitter adds next
+   to nothing). null until there are NOW_MIN of fixes, and when the last good
+   fix is older than NOW_STALE. */
+function nowKph() {
+  var n = H.length;
+  if (n < 4 || Date.now() - hAt > NOW_STALE) return null;
+  var dt = H[n - 2] - H[0];
+  if (dt < NOW_MIN) return null;
+  return Math.max(0, (H[n - 1] - H[1]) * 3600000 / dt);
+}
+
+/* km back to the origin along the trail: its length, plus the straight bit
+   from its last point to the last good fix. null before the first good fix.
+   The trail is only cut every SCAN metres and once a cut saves SAVED, so
+   when you have just turned back and are beside its last stretch, it is the
+   length to the place on that stretch nearest you, plus the step across. */
+function homeKm() {
+  if (!N) return null;
+  var l = 2 * N - 2, m = C[N - 1] + hyp(px - XY[l], py - XY[l + 1]);
+  if (N > 1) {
+    var ex = XY[l] - XY[l - 2], ey = XY[l + 1] - XY[l - 1], len = C[N - 1] - C[N - 2];
+    var ax = px - XY[l - 2], ay = py - XY[l - 1];
+    var t = len ? (ax * ex + ay * ey) / (len * len) : 0;
+    if (t < 1) {
+      t = Math.max(0, t);
+      m = Math.min(m, C[N - 2] + t * len + hyp(ax - t * ex, ay - t * ey));
+    }
+  }
+  return m / 1000;
+}
+
+/* Speeds for the UI, in kph (numbers), or null before there is a value,
+   and the way home: { out, back, now: kph|null, home: km|null }.
    out: average from the start to the turnaround (frozen after it).
    back: average since the turnaround (null while still walking out).
-   A half has no value until GPS has tracked it for MIN_MS. */
+   A half has no value until GPS has tracked it for MIN_MS.
+   now: the speed over the last NOW_MS (see nowKph).
+   home: km to the origin by the trail (see homeKm). */
 exports.get = function () {
   var s = exports.stats();
   return {
     out: s.outMs >= MIN_MS ? s.outKm * 3600000 / s.outMs : null,
-    back: s.backMs >= MIN_MS ? s.backKm * 3600000 / s.backMs : null
+    back: s.backMs >= MIN_MS ? s.backKm * 3600000 / s.backMs : null,
+    now: nowKph(),
+    home: homeKm()
   };
+};
+
+/* The trail home for tests and debugging: { n: points, m: its length in
+   metres (without the bit to where you are), cd: m between points }. */
+exports.trail = function () {
+  return { n: N, m: N ? C[N - 1] : 0, cd: S ? S.cd : CRUMB };
 };
 
 /* A speed from get() as text: "5.2 kph", or "-- kph" when it is null.

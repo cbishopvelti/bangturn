@@ -30,7 +30,8 @@ Data files:
 | File | Contents | Written by |
 |---|---|---|
 | `bangturn.json` | Walk state (below) | `lib.js` only |
-| `bangturn.gps.json` | `{start, outKm, outMs, backKm, backMs, ...}`: distance and GPS time for each half, plus where tracking had got to | `speed.js` only |
+| `bangturn.gps.json` | `{start, outKm, outMs, backKm, backMs, ...}`: distance and GPS time for each half, plus where tracking had got to, and the trail home's origin and spacing (`oa`, `oo`, `cd`) | `speed.js` only |
+| `bangturn.trail` | The trail home's points: the bytes of an `Int16Array` of metres east and north of the origin, 4 bytes a point, 2 KB at most | `speed.js` only |
 | `sched.json` | Six entries with ids `bangturn.*` | `lib.js` only, through the `sched` module |
 
 ## Walk state: `bangturn.json`
@@ -172,13 +173,19 @@ For the UI:
 
 | Function | Does |
 |---|---|
-| `get()` | `{out, back}` in kph (numbers), or `null` where there's no value yet. `out` freezes at the turnaround; `back` is `null` until then. A half has no value until GPS has tracked it for 10 s. |
+| `get()` | `{out, back, now, home}`. `out`, `back`: average kph (numbers), or `null` where there's no value yet. `out` freezes at the turnaround; `back` is `null` until then. A half has no value until GPS has tracked it for 10 s. `now`: kph over the last 20 s of fixes, `null` with under 5 s of them or no good fix for 15 s. `home`: km to the origin along the trail, `null` before the first good fix. |
 | `fmt(kph)` | `"5.2 kph"`, or `"-- kph"` for `null`. Use this rather than `toFixed(1)`, which doesn't carry in Espruino (`4.96` gives `"4.9"`). |
 | `stats()` | `{outKm, outMs, backKm, backMs, tracking}`: the distance and tracked time behind the speeds (for tests and debugging) |
+| `trail()` | `{n, m, cd}`: points on the trail home, its length in metres, and the metres between points (for tests and debugging) |
 
-So the rows are `"Out " + speed.fmt(v.out)` and, on the walk back,
-`"Back " + speed.fmt(v.back)`, with `v = speed.get()`. Calling `get()` every
-second is fine: it only reads RAM.
+The app's `lines()` turns `v = speed.get()` into the rows: Out and (on the
+walk back) Back, each with its average and the time to the origin at that
+speed (`v.home / speed`), and a bottom row with the speed needed
+(`v.home / status().remaining`), `v.now` and the difference between them.
+`drawRows()` draws the first two in columns and `drawGoal()` the bottom row,
+with a target and a speedometer symbol, and the speed now and the
+difference in the colour that says how they compare.
+Calling `get()` every second is fine: it only reads RAM.
 
 How it tracks:
 
@@ -198,6 +205,29 @@ How it tracks:
   to nothing. Time is the time between good fixes by the GPS clock
   (`fix.time`), so neither the wait for the first fix nor `-1 min` changes
   the average. A gap with no fixes is bridged in a straight line.
+- The speed now is the distance counted (the same 10 m steps, plus the step
+  in progress) between samples of the good fixes of the last 20 s (one every
+  2 s at most), kept in a short list in RAM. It starts again after an app change.
+- The trail home is a line of points about 10 m apart, from the origin (the
+  first good fix) to where you are, kept as whole metres east and north of
+  the origin in an `Int16Array` (room for 64 points to start with, doubling
+  to 512; a longer trail is thinned to every other point, and points are
+  then twice as far apart). A gap in the fixes is filled with points in a
+  straight line. Every 5 m moved, the trail is looked through for the
+  earliest point within 25 m that is at least 12 m shorter to go straight
+  to than to follow the trail to: the trail is cut back to it. (The search
+  checks every 4th point and only looks closely around the near ones:
+  Espruino re-reads a loop's text on every pass, so the inner loop is kept
+  tiny.) That one rule drops loops and detours on
+  the way out, shortens the trail as it is retraced, and forgets a detour on
+  the way back when it rejoins the trail. 12 m is more than any right-angle
+  corner saves within 25 m, so corners stay. `get().home` is the trail's
+  length plus the straight bit from its last point to the last good fix
+  (or, just after turning back, the length to the nearest place on the
+  trail's last stretch). The trail has its own file, `bangturn.trail`,
+  written on `"kill"` and at most every 5 minutes (it is bigger than the
+  rest of the state). After a crash the trail carries on in a straight line
+  from where it was last saved.
 - Which half a fix belongs to follows the core's clock: `back` once
   `Date.now()` is `TURN` past the effective start. `-1 min` can move that,
   and the `"offset"` event tells the module.

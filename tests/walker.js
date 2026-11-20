@@ -29,14 +29,15 @@ function walker(h, opts) {
   w.move = (north, east) => { w.lon += dLon(east || 0); w.lat += dLat(north); };
   w.skip = sec => { w.t += sec * 1000; };
   /* walk at `kph` for `sec` seconds with a fix every `step` seconds.
-     o.east: head east instead of north; o.south: head south;
+     o.east: head east instead of north; o.south: head south; o.west: west;
      o.jitter: km each fix is off to the side, alternating left and right */
   w.walk = (kph, sec, o) => {
     o = o || {};
     const step = o.step || 1, km = kph * step / 3600;
     const sign = o.south ? -1 : 1;
-    const a = o.east ? 0 : sign * dLat(km), b = o.east ? dLon(km) : 0;
-    const ja = o.east ? dLat(o.jitter || 0) : 0, jb = o.east ? 0 : dLon(o.jitter || 0);
+    const ew = o.east || o.west;
+    const a = ew ? 0 : sign * dLat(km), b = ew ? (o.west ? -1 : 1) * dLon(km) : 0;
+    const ja = ew ? dLat(o.jitter || 0) : 0, jb = ew ? 0 : dLon(o.jitter || 0);
     let left = Math.round(sec / step);
     while (left > 0) { // in batches: emit() queues its events
       const n = Math.min(left, 40);
