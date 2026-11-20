@@ -9,7 +9,7 @@
               in the same place, while locked), average speed rows,
               progress bar
    Swipe right goes back to the clock. The minutes-left widget is hidden.
-   - menu:    (idle: Length, Info; the button goes back)
+   - menu:    (idle: Length, Info, Units; the button goes back)
               during a walk: Resume, -1 min (offset shown), Cancel walk,
               Info (GPS via phone/watch, Watch GPS chip on/off, Phone GPS
               setup check, the apps holding GPS, last fix, battery); back to the countdown
@@ -37,12 +37,24 @@ function fit(txt, max, w) {
   return s;
 }
 
-/* "5.2 kph", or "-- kph" before there is a speed. Not toFixed(1):
-   Espruino's doesn't carry, so 4.96 would show as 4.9. */
+/* The speed units setting ("kph" or "mph"), read once here and updated by
+   the Units menu item, so drawing doesn't read Storage every second */
+var units = bt.getUnits();
+
+/* "5.2 kph" (or "3.2 mph"), or "-- kph" before there is a speed. v is in
+   kph. Not toFixed(1): Espruino's doesn't carry, so 4.96 would show as 4.9. */
 function kph(v) {
-  if (typeof v != "number" || !isFinite(v)) return "-- kph";
-  var n = Math.round(v * 10);
-  return Math.floor(n / 10) + "." + (n % 10) + " kph";
+  if (typeof v != "number" || !isFinite(v)) return "-- " + units;
+  var n = Math.round(bt.toUnits(v, units) * 10);
+  return Math.floor(n / 10) + "." + (n % 10) + " " + units;
+}
+/* The Units item of both button menus: a tap switches kph <-> mph and
+   redraws the menu (on the same item) */
+function unitsItem(menu, again, i) {
+  menu["Units: " + units] = function () {
+    units = bt.setUnits(units == "kph" ? "mph" : "kph");
+    again(i);
+  };
 }
 
 function pad(n) { return ("0" + n).substr(-2); }
@@ -275,6 +287,7 @@ function showIdleMenu(selected) {
   var menu = { "": { title: "BangTurn", back: showMain, selected: selected || 0 } };
   menu["Length: " + bt.getMins() + " min"] = function () { stopMenuTimer(); showPicker(); };
   menu["Info"] = function () { showInfo(); };
+  unitsItem(menu, showIdleMenu, 2);
   E.showMenu(menu);
   startMenuTimer();
 }
@@ -291,6 +304,7 @@ function showWalkMenu(selected) {
   };
   menu["Cancel walk"] = function () { bt.cancel(); showMain(); };
   menu["Info"] = function () { showInfo(); };
+  unitsItem(menu, showWalkMenu, 4);
   E.showMenu(menu);
   startMenuTimer();
 }
