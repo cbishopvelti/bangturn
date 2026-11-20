@@ -46,6 +46,7 @@ var KM_PER_DEG = 111.195;
      rej }           jumps in a row so far */
 var S;
 var T0;             // effective start of the walk (ms, the watch's clock)
+var DUR;            // the walk's length (ms)
 var tracking = false;
 var dirty = false;  // S has changed since it was saved
 var saved;          // fix time of the last save
@@ -105,7 +106,7 @@ function onGPS(f) {
   var bt = require("bangturn");
   var el = Date.now() - T0;
   // The walk is over. The core's "end" follows, but never leave GPS on.
-  if (el >= bt.DURATION) return stop();
+  if (el >= DUR) return stop();
   if (!f.fix || isNaN(f.lat) || isNaN(f.lon) || f.hdop > HDOP_MAX) return;
   var t = f.time ? f.time.getTime() : NaN;
   var gt = !isNaN(t);
@@ -120,7 +121,7 @@ function onGPS(f) {
     if (++S.rej >= MAX_REJECT) restart(f, t, gt);
     return;
   }
-  if (!S.bk && el >= bt.TURN) {
+  if (!S.bk && el >= DUR / 2) {
     // first fix of the walk back: Out ends at the last place seen
     closeStep(S.la, S.lo);
     S.bk = true;
@@ -148,9 +149,10 @@ function begin(s, fresh) {
   S = f && f.start === s.start ? f :
     { start: s.start, outKm: 0, outMs: 0, backKm: 0, backMs: 0, bk: false, pk: 0, rej: 0 };
   T0 = bt.startTime(s);
+  DUR = bt.duration(s);
   dirty = false;
   saved = undefined;
-  if (Date.now() - T0 < bt.DURATION) listen();
+  if (Date.now() - T0 < DUR) listen();
   else stop();
 }
 

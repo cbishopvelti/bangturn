@@ -1,6 +1,6 @@
 # BangTurn
 
-A Bangle.js 2 app that tells you when to turn around on a one-hour out-and-back walk.
+A Bangle.js 2 app that tells you when to turn around on an out-and-back walk (an hour, or the length you set).
 
 Press the button to start. At 30 minutes the watch buzzes hard and shows
 **TURN AROUND**. On the way back it buzzes 1, 2, 3 and 4 times at 15, 8, 4 and
@@ -8,6 +8,11 @@ Press the button to start. At 30 minutes the watch buzzes hard and shows
 countdown and your average speed out and back (GPS), and a widget shows the
 minutes left in other apps. Press the button during a walk for **Resume**,
 **-1 min** (if you started late) and **Cancel walk**.
+
+To change the walk length, swipe left on the idle screen (or go to Settings >
+Apps > BangTurn) and drag the hours and minutes wheels. The countdown shows
+the total in minutes, so 1 h 30 starts at `90:00`. A new length applies to
+the next walk.
 
 - Spec: [docs/spec.md](docs/spec.md)
 - How it's built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)

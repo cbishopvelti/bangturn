@@ -12,23 +12,65 @@ var FILE = "bangturn.json";
 var APPID = "bangturn";
 var MIN = 60000;
 
-/* Walk length. The only place the duration lives: everything else derives
-   from it, so making the walk adjustable later means changing this. */
-var DURATION = 60 * MIN;
+/* Walk length. The default is an hour; the user picks their own with the
+   duration picker (Settings > Apps > BangTurn, or swipe left on the idle
+   screen), saved in bangturn.settings.json as { mins }. Each walk keeps
+   the length it was started with (`dur` in bangturn.json), so changing
+   the setting during a walk only changes the next walk. */
+var SETTINGS = "bangturn.settings.json";
+var DEF_MINS = 60;
+var MIN_MINS = 1, MAX_MINS = 9 * 60 + 59; // the picker's hours wheel is 0-9
+var DURATION = DEF_MINS * MIN;
 var TURN = DURATION / 2;
 
-/* The six sched entries, as [id, ms after the (effective) start].
-   left15..left1 are the walk-back countdown buzzes; `n` buzzes each. */
-var EVENTS = [
-  ["turn", TURN],
-  ["left15", DURATION - 15 * MIN],
-  ["left8", DURATION - 8 * MIN],
-  ["left4", DURATION - 4 * MIN],
-  ["left1", DURATION - 1 * MIN],
-  ["end", DURATION]
-];
+/* Countdown buzzes at these minutes left (n buzzes for the nth), only
+   those after the turnaround (a 20 minute walk skips the 15 min buzz). */
+var LEFT = [15, 8, 4, 1];
+
+/* The sched entries for a walk of `dur` ms, as [id, ms after the
+   (effective) start]. left15..left1 are the walk-back countdown buzzes. */
+function events(dur) {
+  var list = [["turn", dur / 2]];
+  LEFT.forEach(function (n) {
+    if (dur - n * MIN > dur / 2) list.push(["left" + n, dur - n * MIN]);
+  });
+  list.push(["end", dur]);
+  return list;
+}
+var EVENTS = events(DURATION);
 var BUZZES = { left15: 1, left8: 2, left4: 3, left1: 4 };
 
+exports.events = events;
+exports.SETTINGS = SETTINGS;
+exports.MIN_MINS = MIN_MINS;
+exports.MAX_MINS = MAX_MINS;
+
+/* The walk length setting, in whole minutes */
+exports.getMins = function () {
+  var m = (require("Storage").readJSON(SETTINGS, 1) || {}).mins;
+  return typeof m == "number" && m >= MIN_MINS && m <= MAX_MINS ? Math.round(m) : DEF_MINS;
+};
+/* Save the walk length setting (clamped). Applies to the next walk.
+   Emits "settings". Returns the minutes saved. */
+exports.setMins = function (m) {
+  m = isNaN(m) ? DEF_MINS : Math.max(MIN_MINS, Math.min(MAX_MINS, Math.round(m)));
+  var o = require("Storage").readJSON(SETTINGS, 1) || {};
+  o.mins = m;
+  require("Storage").writeJSON(SETTINGS, o);
+  emit("settings");
+  return m;
+};
+
+/* Length in ms of the walk with state `s`, or of the next walk when idle.
+   A walk saved before lengths were adjustable has no `dur`: an hour. */
+exports.duration = function (s) {
+  s = s || exports.read();
+  if (exports.isActive(s)) return (s.dur || DEF_MINS) * MIN;
+  return exports.getMins() * MIN;
+};
+
+/* the default walk (an hour) and its turnaround; a walk's own length is
+   duration(s) or status().duration */
 exports.DURATION = DURATION;
 exports.TURN = TURN;
 exports.EVENTS = EVENTS;
@@ -42,6 +84,7 @@ function emit(type) {
 /* ---------- state (bangturn.json) ----------
    {} when idle, otherwise:
    { start: ms the walk was started (button press),
+     dur: the walk's length in minutes (the setting when it started),
      offset: number of "-1 min" taps (minutes the start was moved earlier),
      turned: true once the turnaround has passed (alarm fired or skipped),
      alert: "turn" while a turnaround alert is waiting to be shown (transient) } */
@@ -66,22 +109,27 @@ exports.startTime = function (s) {
 };
 
 /* Snapshot of the walk for drawing.
-   { active, phase: "idle"|"out"|"back", elapsed, remaining, toTurn, offset, turned, start }
+   { active, phase: "idle"|"out"|"back", duration, turn, elapsed, remaining,
+     toTurn, offset, turned, start }
+   duration is the walk's length (the next walk's when idle), turn its half.
    elapsed/remaining/toTurn are ms, clamped to >= 0. */
 exports.status = function (now, s) {
   if (now === undefined) now = Date.now();
   s = s || exports.read();
+  var dur = exports.duration(s), turn = dur / 2;
   if (!exports.isActive(s))
-    return { active: false, phase: "idle", elapsed: 0, remaining: DURATION, toTurn: TURN, offset: 0, turned: false };
+    return { active: false, phase: "idle", duration: dur, turn: turn, elapsed: 0, remaining: dur, toTurn: turn, offset: 0, turned: false };
   var start = exports.startTime(s);
   var elapsed = Math.max(0, now - start);
   return {
     active: true,
-    phase: elapsed < TURN ? "out" : "back",
+    phase: elapsed < turn ? "out" : "back",
+    duration: dur,
+    turn: turn,
     start: start,
     elapsed: elapsed,
-    remaining: Math.max(0, DURATION - elapsed),
-    toTurn: Math.max(0, TURN - elapsed),
+    remaining: Math.max(0, dur - elapsed),
+    toTurn: Math.max(0, turn - elapsed),
     offset: s.offset || 0,
     turned: !!s.turned
   };
@@ -154,7 +202,7 @@ exports.schedule = function (now, s) {
   if (!exports.isActive(s)) return exports.clearSched();
   var start = exports.startTime(s);
   var list = [];
-  EVENTS.forEach(function (e) {
+  events(exports.duration(s)).forEach(function (e) {
     var at = start + e[1];
     if (at <= now) return;
     if (e[0] == "turn" && s.turned) return;
@@ -188,7 +236,7 @@ exports.catchUp = function (now) {
 exports.start = function (at) {
   var now = Date.now();
   if (at === undefined) at = now;
-  var s = { start: at, offset: 0, turned: false };
+  var s = { start: at, dur: exports.getMins(), offset: 0, turned: false };
   exports.write(s);
   exports.schedule(now, s);
   emit("start");
@@ -242,7 +290,7 @@ exports.minusOne = function (now) {
    - "left15".."left1": require("bangturn.alerts").countdown(n) in place,
      whatever app is open. Emits "buzz". Skipped if over a minute late.
    - "end": finish() (silent). Emits "end". So does any entry that fires
-     after the walk's hour is up. */
+     after the walk's time is up. */
 exports.fire = function (id) {
   var s = exports.read();
   // drop this entry (and any other already-past ones) and re-arm sched
@@ -270,7 +318,8 @@ exports.fire = function (id) {
    skipped. The turnaround alarm still shows when late. */
 var LATE = MIN;
 function late(id, s) {
-  var e = EVENTS.filter(function (e) { return e[0] == id; })[0];
+  var e = events(exports.duration(s)).filter(function (e) { return e[0] == id; })[0];
+  if (!e) return true;
   return Date.now() - (exports.startTime(s) + e[1]) > LATE;
 }
 

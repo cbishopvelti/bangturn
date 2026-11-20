@@ -69,7 +69,7 @@ test("start writes state and six sched entries", async h => {
   const now = h.eval("Date.now()");
   h.tx(`${BT}.start(${now})`);
   const s = h.eval(`${BT}.read()`);
-  assert.eq(s, { start: now, offset: 0, turned: false }, "bangturn.json");
+  assert.eq(s, { start: now, dur: 60, offset: 0, turned: false }, "bangturn.json");
   expectEntries(h, now, ALL);
   assert.eq(h.eval("EV"), ["start"]);
   const st = h.eval(`${BT}.status(${now + 10 * MIN})`);

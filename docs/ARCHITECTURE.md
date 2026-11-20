@@ -15,6 +15,8 @@ colliding. The behaviour itself is in [spec.md](spec.md).
 | `boot.js` | `bangturn.boot.js` | Starts the speed module when a walk is running; ends a walk whose hour ran out while the watch was off | GPS speed |
 | `speed.js` | `bangturn.speed` (module) | GPS power, distance tracking in the background, average speeds for the UI | GPS speed |
 | `widget.js` | `bangturn.wid.js` | Minutes-left widget | widget |
+| `picker.js` | `bangturn.picker` (module) | Hours/minutes scroll wheel picker for the walk length: `show(mins, done)` | UI |
+| `settings.js` | `bangturn.settings.js` | Settings > Apps > BangTurn: "Length: N min" opens the picker | UI |
 | `metadata.json`, `tests/harness.js`, `tests/run.js`, `tools/install.js` | | App loader metadata, test harness, Web IDE installer | core (add your storage entries and tests freely) |
 
 Each task owns its files. Stubs are in place and already work end to end
@@ -49,13 +51,20 @@ from it. Read state through the module, not the file.
 
 ## Core module: `require("bangturn")`
 
-Constants: `DURATION` (3600000, the only place the walk length lives),
-`TURN` (`DURATION/2`), `EVENTS` (`[id, ms after start]` pairs), `BUZZES`
+Walk length: `getMins()` / `setMins(m)` read and save the setting
+(`bangturn.settings.json`, `{mins}`, default 60, 1 to 599; `setMins` emits
+`"settings"`). `start()` copies it into the walk as `dur` (minutes), so a
+change only affects the next walk. `duration(s)` is the walk's length in ms
+(the setting's when idle; 60 min for a walk saved without `dur`), and
+`events(dur)` its `[id, ms after start]` pairs: the countdown buzzes only
+when they come after the turnaround. Use `status().duration` and
+`status().turn`, not the constants, which are only the default hour:
+`DURATION` (3600000), `TURN`, `EVENTS` (the hour's), `BUZZES`
 (`{left15:1, left8:2, left4:3, left1:4}`).
 
 | Function | Does |
 |---|---|
-| `status(now?)` | `{active, phase, elapsed, remaining, toTurn, offset, turned, start}`. `phase` is `"idle"`, `"out"` or `"back"`. Times are ms, never negative. Use this for all drawing. |
+| `status(now?)` | `{active, phase, duration, turn, elapsed, remaining, toTurn, offset, turned, start}`. `phase` is `"idle"`, `"out"` or `"back"`. Times are ms, never negative. Use this for all drawing. |
 | `fmt(ms)` | `"60:00"` (m:ss, no hours, rounds up to the second) |
 | `mins(ms)` / `untilMins(ms)` | The minutes of `fmt(ms)` (`47` for `47:30`, rounded down), used by the widget and the locked app; and ms until they change |
 | `isActive()` | A walk is running |
@@ -92,6 +101,8 @@ Listen with `Bangle.on("bangturn", function(type) {...})`. On `"end"` and
 
 On start (and after every `-1 min`) the core writes one plain `sched` alarm
 per future event, at an absolute local time and date:
+
+Times below are for the default hour; for other lengths they are half the walk and 15/8/4/1 min before the end.
 
 | id | When (after the effective start) | `fire()` does |
 |---|---|---|

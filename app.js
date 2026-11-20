@@ -1,6 +1,7 @@
 /* BangTurn app, installed as "bangturn.app.js".
    OWNED BY: UI task. Screens and menu from docs/spec.md "UI":
-   - idle:    60:00, time of day, "Press to start"
+   - idle:    60:00 (the walk length), time of day, "Press to start";
+              swipe left opens the walk length picker (bangturn.picker)
    - running: small row with the time of day and the walk's start time,
               big m:ss countdown of the whole walk (just the minutes,
               in the same place, while locked), average speed rows,
@@ -60,7 +61,7 @@ function lines(st, now) {
   var L = { full: full, time: st.active && locked ? "" + bt.mins(st.remaining) : full, rows: [] };
   L.now = hms(now, !locked);
   if (st.active) L.start = "Start " + hms(bt.startTime(), true);
-  if (!st.active) L.rows.push("Press to start");
+  if (!st.active) L.rows.push("Press to start", "< Swipe: length");
   else {
     var sp = speed.get() || {};
     L.rows.push("Out " + kph(sp.out));
@@ -106,10 +107,10 @@ function draw() {
   // progress bar of the whole walk, with a notch at the turnaround
   var bx = R.x + 6, bw = R.w - 12, by = R.y2 - 16, bh = 12;
   g.drawRect(bx, by, bx + bw - 1, by + bh - 1);
-  var fill = Math.round((bw - 4) * Math.min(1, st.elapsed / bt.DURATION));
+  var fill = Math.round((bw - 4) * Math.min(1, st.elapsed / st.duration));
   if (fill > 0) g.fillRect(bx + 2, by + 2, bx + 1 + fill, by + bh - 3);
-  var tx = bx + Math.round(bw * bt.TURN / bt.DURATION);
-  g.setColor(st.elapsed >= bt.TURN ? g.theme.bg : g.theme.fg)
+  var tx = bx + Math.round(bw * st.turn / st.duration);
+  g.setColor(st.elapsed >= st.turn ? g.theme.bg : g.theme.fg)
     .drawLine(tx, by - 3, tx, by + bh + 2);
   g.setColor(g.theme.fg).drawLine(tx, by - 3, tx, by - 1).drawLine(tx, by + bh, tx, by + bh + 2);
   return st;
@@ -164,10 +165,24 @@ function showMain() {
     mode: "custom",
     btn: function () { if (bt.isActive()) showWalkMenu(); else start(); },
     touch: function () { if (!bt.isActive()) start(); },
-    // swipe right: back to the clock (the walk keeps running)
-    swipe: function (lr) { if (lr > 0) load(); }
+    // swipe right: back to the clock (the walk keeps running);
+    // swipe left before a walk: set the walk length
+    swipe: function (lr) {
+      if (lr > 0) load();
+      else if (lr < 0 && !bt.isActive()) showPicker();
+    }
   });
   tick();
+}
+
+/* The hours/minutes wheels; the length is saved for the next walk */
+function showPicker() {
+  stopTimers();
+  screen = "picker";
+  require("bangturn.picker").show(bt.getMins(), function (mins) {
+    bt.setMins(mins);
+    showMain();
+  });
 }
 
 function start() {

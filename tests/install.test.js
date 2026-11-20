@@ -19,11 +19,11 @@ test("metadata.json: fields the App Loader needs, files, version", async () => {
     assert(s.name == meta.id || s.name.startsWith(meta.id + "."), `${s.name} starts with the app id`);
   }
   const listed = meta.storage.map(s => s.url);
-  for (const f of ["app.js", "app-icon.js", "lib.js", "alerts.js", "speed.js", "boot.js", "widget.js"])
+  for (const f of ["app.js", "app-icon.js", "lib.js", "alerts.js", "speed.js", "boot.js", "widget.js", "picker.js", "settings.js"])
     assert(listed.includes(f), `${f} is installed`);
   assert(fs.existsSync(path.join(ROOT, meta.readme)), "README exists");
   // the data files are the ones the code writes
-  assert.eq(meta.data.map(d => d.name).sort(), ["bangturn.gps.json", "bangturn.json"]);
+  assert.eq(meta.data.map(d => d.name).sort(), ["bangturn.gps.json", "bangturn.json", "bangturn.settings.json"]);
   assert(/"bangturn\.json"/.test(fs.readFileSync(path.join(ROOT, "lib.js"), "utf8")));
   assert(/"bangturn\.gps\.json"/.test(fs.readFileSync(path.join(ROOT, "speed.js"), "utf8")));
   // the App Loader shows the last ChangeLog entry as the version's notes
