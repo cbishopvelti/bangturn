@@ -61,3 +61,57 @@ test("sits to the left of the battery", async h => {
   assert(x[1] !== null, "battery widget present");
   assert(x[0] < x[1], "bangturn x " + x[0] + " < battery x " + x[1]);
 });
+
+/* tap on the number opens BangTurn (clock face only) */
+const centre = h => h.eval("[WIDGETS.bangturn.x+14,WIDGETS.bangturn.y+12]");
+const tap = (h, x, y) => h.tx(`global.LOADING=1;Bangle.emit("touch",1,{x:${x},y:${y},type:0})`);
+async function settle(h) {
+  for (let i = 0; i < 30; i++) {
+    await h.wait(100);
+    if (h.eval("global.LOADING===undefined && global.__FILE__!==undefined")) return;
+  }
+}
+
+test("tap on the number on the clock opens BangTurn", async h => {
+  h.tx(`${BT}.start(Date.now()-5*${MIN})`);
+  await h.load();
+  const clock = h.eval("global.__FILE__");
+  assert(clock != "bangturn.app.js", "on the clock: " + clock);
+  const [x, y] = centre(h);
+  tap(h, x, y);
+  await settle(h);
+  assert.eq(h.eval("global.__FILE__"), "bangturn.app.js");
+});
+
+test("tap just outside the box (edge of target) still opens, further away doesn't", async h => {
+  h.tx(`${BT}.start(Date.now()-5*${MIN})`);
+  await h.load();
+  const clock = h.eval("global.__FILE__");
+  const [x0, y0] = h.eval("[WIDGETS.bangturn.x,WIDGETS.bangturn.y]");
+  tap(h, x0 - 10, y0 + 12); // over the neighbour on the left
+  await h.wait(600);
+  tap(h, x0 + 14, y0 + 60); // in the clock
+  await h.wait(600);
+  assert.eq(h.eval("global.__FILE__"), clock, "taps away from the number ignored");
+  tap(h, x0 - 3, y0 + 33);
+  await settle(h);
+  assert.eq(h.eval("global.__FILE__"), "bangturn.app.js");
+});
+
+test("tap does nothing when idle", async h => {
+  await h.load();
+  const clock = h.eval("global.__FILE__");
+  h.tx(`global.LOADING=1;Bangle.emit("touch",1,{x:${176 - 40},y:12,type:0})`);
+  await h.wait(800);
+  assert.eq(h.eval("global.__FILE__"), clock);
+});
+
+test("tap at the widget's spot inside BangTurn doesn't reload it", async h => {
+  h.tx(`${BT}.start(Date.now()-5*${MIN})`);
+  await h.load("bangturn.app.js");
+  assert.eq(width(h), 0, "hidden in the app");
+  h.tx("global.MARK=1");
+  h.tx(`Bangle.emit("touch",1,{x:${176 - 40},y:12,type:0})`);
+  await h.wait(800);
+  assert.eq(h.eval("global.MARK"), 1, "no reload");
+});
