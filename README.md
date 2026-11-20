@@ -151,6 +151,10 @@ To tell BangTurn from a faulty watch:
    and off, a few seconds after the walk starts or you open BangTurn (the
    watch's GPS runs until the phone's first fix arrives). **Last fix** says
    how long ago GPS last gave a position, and **Battery** the charge left.
+   **GPS apps** lists every app that has asked for GPS (BangTurn shows as
+   bangturn), from the firmware's own list. If an app other than bangturn
+   is there, it's keeping GPS on too. With phone GPS an app can be listed while the chip is off:
+   Watch GPS says whether the chip itself is on.
    Tap a row to refresh it. If it says watch and ON, the phone isn't
    supplying GPS.
 5. The Power Manager app's logging can show which code keeps waking the
