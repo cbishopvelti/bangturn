@@ -74,14 +74,18 @@ function hms(t, secs) {
 }
 
 /* What the main screen shows, as plain data (also used by the tests).
-   now: time of day, with seconds only while unlocked (locked redraws once
-   a minute, so seconds would be stale). start: the walk's start time,
-   moved earlier by any -1 min taps, always with seconds (it's fixed, so
+   now: time of day, with seconds while unlocked. Locked, it's HH:MM and
+   dim holds the seconds (":37"), drawn grey after it: locked redraws only
+   once a minute, so they are the seconds of the last redraw (the lock, then
+   ":00" on each minute) and don't tick. The countdown does the same with
+   time and timeDim (the lock, then ":59" as each minute starts).
+   start: the walk's start time, moved earlier by any -1 min taps, always with seconds (it's fixed, so
    they never go stale).
    rows: strings when idle. During a walk, objects (drawn in columns):
-   - {a:"Out"|"Back", v, tf, t}: the half's average speed v, and tf, the time
-     to the origin at that speed along the trail home (speed.get().home).
-     t is what is drawn of it: like the countdown, just the minutes while
+   - {a:"Out"|"Back", v, tf, t, td}: the half's average speed v, and tf, the
+     time to the origin at that speed along the trail home
+     (speed.get().home). t is the part of it drawn in the text colour and td
+     the part drawn grey: like the countdown, the seconds are grey while
      locked.
    - {a:"Now", v, b:"Need", w, c}: the speed over the last few seconds, and
      the speed that covers the way home in the time left on the countdown.
@@ -91,11 +95,14 @@ function hms(t, secs) {
 function lines(st, now) {
   if (now === undefined) now = Date.now();
   var locked = Bangle.isLocked();
-  // locked redraws once a minute, so drop the seconds that would freeze:
-  // full is the whole m:ss (for layout), time what is drawn ("47" of "47:30")
-  var full = bt.fmt(st.remaining);
-  var L = { full: full, time: st.active && locked ? "" + bt.mins(st.remaining) : full, rows: [] };
+  // locked redraws once a minute, so the seconds would freeze: they are
+  // drawn grey. full is the whole m:ss (for layout), time the black part
+  // ("47" of "47:30") and timeDim the grey part (":30")
+  var full = bt.fmt(st.remaining), dimTime = st.active && locked;
+  var L = { full: full, time: dimTime ? "" + bt.mins(st.remaining) : full, rows: [] };
+  L.timeDim = dimTime ? full.substr(full.indexOf(":")) : "";
   L.now = hms(now, !locked);
+  L.dim = locked ? hms(now, true).substr(5) : "";
   L.nowFull = hms(now, true); // for layout, so HH:MM doesn't move when locked
   if (st.active) L.start = "Start " + hms(bt.startTime(), true);
   if (!st.active) L.rows.push("Tap to start", "Button: length");
@@ -103,7 +110,8 @@ function lines(st, now) {
     var sp = speed.get() || {};
     var row = function (a, v) {
       var tf = tto(sp.home, v);
-      L.rows.push({ a: a, v: kph(v), tf: tf, t: locked ? tf.split(":")[0] : tf });
+      var i = locked ? tf.indexOf(":") : -1;
+      L.rows.push({ a: a, v: kph(v), tf: tf, t: i < 0 ? tf : tf.substr(0, i), td: i < 0 ? "" : tf.substr(i) });
     };
     row("Out", sp.out);
     if (st.phase == "back") row("Back", sp.back);
@@ -125,22 +133,30 @@ function drawClock(L) {
   g.reset();
   if (L.start) {
     g.clearRect(R.x, R.y, R.x2, R.y + 39);
-    // sized and placed as the full HH:MM:SS, so HH:MM stays put when the
-    // seconds are left off while locked; the GPS symbol sits at the left
-    // and doesn't move it either
-    g.setFont("Vector", 20).setFontAlign(-1, 0);
-    g.drawString(L.now, R.x2 - 3 - g.stringWidth(L.nowFull), y - 1);
+    // sized and placed as the full HH:MM:SS, so HH:MM stays put whether
+    // the seconds are black or grey; the GPS symbol sits at the left and
+    // doesn't move it either
+    g.setFont("Vector", 20);
+    drawNow(L, R.x2 - 3 - g.stringWidth(L.nowFull), y - 1);
     g.setFontAlign(1, 0).drawString(L.start.substr(6), R.x2 - 3, y + 18);
     g.setFont("Vector", 15).setFontAlign(-1, 0).drawString("Start", R.x + 3, y + 19);
     drawIcon(gpsIcon());
   } else {
     g.clearRect(R.x, y - 11, R.x2, y + 11);
-    // sized and placed as the full HH:MM:SS, so HH:MM stays put when the
-    // seconds are left off while locked
+    // sized and placed as the full HH:MM:SS, so HH:MM stays put whether
+    // the seconds are black or grey
     fit(L.nowFull, 20, R.w - 4);
-    g.setFontAlign(-1, 0).drawString(L.now, R.x + (R.w - g.stringWidth(L.nowFull)) / 2, y);
+    drawNow(L, R.x + (R.w - g.stringWidth(L.nowFull)) / 2, y);
   }
   g.setFontAlign(0, 0);
+}
+function drawNow(L, x, y) { drawDim(L.now, L.dim, x, y); }
+/* s from x in the text colour, then dim (locked seconds) in grey. The 3-bit
+   screen dithers grey; a half-and-half #888 loses the small walk-screen
+   digits, so it leans towards the text colour. */
+function drawDim(s, dim, x, y) {
+  g.setFontAlign(-1, 0).drawString(s, x, y);
+  if (dim) g.setColor(g.theme.dark ? "#aaa" : "#555").drawString(dim, x + g.stringWidth(s), y).setColor(g.theme.fg);
 }
 
 /* The GPS symbol left of the time of day (top row) during a walk: where the
@@ -209,10 +225,10 @@ function drawRows(rows) {
       fit(r.w, NUM, x2 - kx - 6 - g.stringWidth(r.b));
       g.setFontAlign(1, 0).drawString(r.w, x2, y);
     } else {
-      // placed as the whole m:ss, so the minutes don't move while locked
-      // (smaller only for a time of 100 minutes or more)
+      // placed as the whole m:ss, so the minutes don't move when the
+      // seconds turn grey (smaller only for a time of 100 minutes or more)
       fit(r.tf, NUM, x2 - kx - 1);
-      g.drawString(r.t, x2 - g.stringWidth(r.tf), y);
+      drawDim(r.t, r.td, x2 - g.stringWidth(r.tf), y);
     }
   });
   g.setFontAlign(0, 0);
@@ -226,10 +242,10 @@ function draw(st) {
   g.reset().clearRect(R).setFontAlign(0, 0);
   drawnIcon = undefined; // drawn again with the time row during a walk
   // sized and placed as the full m:ss, so the minutes don't move when the
-  // seconds are left off (a line lower during a walk: the start time is
-  // above it)
+  // seconds turn grey (a line lower during a walk: the start time is above
+  // it)
   fit(L.full, 46, w);
-  g.setFontAlign(-1, 0).drawString(L.time, x - g.stringWidth(L.full) / 2, y + 48 + (st.active ? TOP : 0));
+  drawDim(L.time, L.timeDim, x - g.stringWidth(L.full) / 2, y + 48 + (st.active ? TOP : 0));
   g.setFontAlign(0, 0);
   drawClock(L);
   if (!st.active) {

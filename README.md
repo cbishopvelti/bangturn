@@ -93,8 +93,11 @@ before a check that needs the watch on your wrist.
 2. **Start.** Press the button on the idle screen: a menu opens (Length) and nothing buzzes; press it again and you're back on the idle
    screen with no walk. Then tap the screen: one short buzz and the countdown
    runs, with the time of day and, under it, "Start" and the start time (HH:MM:SS) above it.
-   While the watch is locked the seconds go: the countdown shows just `60`
-   (in the same spot) and the time HH:MM; the start time keeps its seconds.
+   While the watch is locked the seconds of the countdown, the time of day
+   and the times to the origin turn grey: locked, the screen only redraws
+   once a minute, so they show the second it last redrew (the moment it
+   locked, then `:59` on the countdown and `:00` on the time as each minute
+   turns) and don't tick. The start time keeps its seconds in black.
    No minutes number by the battery inside the app. Swipe right
    (or long-press) back to the clock: the widget shows `60`, and reopening
    the app shows the right time. With the watch unlocked, tap the number by
