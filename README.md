@@ -149,7 +149,10 @@ walk runs the watch's own GPS):
   updated** on (Gadgetbridge drops phone fixes while it's off). The phone's
   location must be on too.
 
-Info's **Phone GPS** row (below) says which of these is missing.
+Info's **Phone GPS** row (below) says which of these is missing. During a
+walk, the symbol at the right of the Out row shows it at a glance: a phone
+when the speeds come from the phone's GPS, a red crosshair while the watch's
+own GPS chip is on (the battery drain), blank before any GPS.
 
 To tell BangTurn from a faulty watch:
 
@@ -159,7 +162,8 @@ To tell BangTurn from a faulty watch:
    isn't BangTurn: check the Health app's heart rate setting and the
    backlight timeout. To be sure, uninstall BangTurn and repeat.
 3. Note the battery before and after one walk to see what a walk costs.
-4. During a walk, press the button and choose **Info**. **GPS via**
+4. Press the button and choose **Info** (during a walk, or from the start
+   screen's menu). **GPS via**
    says where the last GPS fix came from (phone, or watch for its own GPS)
    and **Watch GPS** says whether the watch's GPS chip is powered, asked of
    the firmware itself. **Phone GPS** checks the phone GPS setup: "working",

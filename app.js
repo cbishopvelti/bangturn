@@ -9,7 +9,7 @@
               in the same place, while locked), average speed rows,
               progress bar
    Swipe right goes back to the clock. The minutes-left widget is hidden.
-   - menu:    (idle: Length; the button goes back)
+   - menu:    (idle: Length, Info; the button goes back)
               during a walk: Resume, -1 min (offset shown), Cancel walk,
               Info (GPS via phone/watch, Watch GPS chip on/off, Phone GPS
               setup check, the apps holding GPS, last fix, battery); back to the countdown
@@ -92,12 +92,48 @@ function drawClock(L) {
   g.setFontAlign(0, 0);
 }
 
+/* The GPS symbol at the right of the Out row during a walk: where the speeds'
+   GPS comes from, from the same facts as Info.
+   "watch": the watch's own GPS chip is on (red: the big battery drain);
+   "phone": the phone's fixes are arriving and the chip is off;
+   "": no GPS yet. Redrawn on its own when it changes (see onGPSIcon). */
+var ICON_W = 18;
+var drawnIcon; // the symbol on screen now
+function gpsIcon(s) {
+  s = s || speed.source();
+  return s.chip ? "watch" : s.from == "phone" ? "phone" : "";
+}
+function drawIcon(k) {
+  drawnIcon = k;
+  var R = Bangle.appRect, cx = R.x2 - ICON_W / 2 - 1, cy = R.y + 88;
+  g.reset().clearRect(R.x2 - ICON_W, cy - 11, R.x2, cy + 11);
+  if (k == "phone") { // a phone: rounded body, screen, button
+    g.drawRect({ x: cx - 6, y: cy - 10, w: 13, h: 21, r: 3 })
+      .drawRect(cx - 4, cy - 7, cx + 4, cy + 4)
+      .fillRect(cx - 1, cy + 6, cx + 1, cy + 7);
+  } else if (k == "watch") { // a GPS crosshair, in red
+    g.setColor(g.theme.dark ? "#f44" : "#f00")
+      .drawCircle(cx, cy, 6).drawCircle(cx, cy, 5).fillCircle(cx, cy, 2)
+      .fillRect(cx - 9, cy, cx - 6, cy).fillRect(cx + 6, cy, cx + 9, cy)
+      .fillRect(cx, cy - 9, cx, cy - 6).fillRect(cx, cy + 6, cx, cy + 9);
+  }
+}
+/* GPS events already wake the watch (the speed tracker listens), so the
+   symbol follows them: redraw it only when it changes. */
+function onGPSIcon(f) {
+  if (screen != "main" || drawnIcon === undefined) return;
+  // from the event itself: the speed tracker may not have seen it yet
+  var k = gpsIcon({ chip: Bangle.getGPSFix() !== undefined, from: f.externalSource ? "phone" : "watch" });
+  if (k != drawnIcon) drawIcon(k);
+}
+
 /* Draws the main screen; returns the status it drew */
 function draw(st) {
   st = st || bt.status();
   var L = lines(st);
   var R = Bangle.appRect, x = R.x + R.w / 2, w = R.w - 4, y = R.y;
   g.reset().clearRect(R).setFontAlign(0, 0);
+  drawnIcon = undefined; // drawn again below during a walk
   // sized and placed as the full m:ss, so the minutes don't move when the
   // seconds are left off
   fit(L.full, 46, w);
@@ -105,10 +141,12 @@ function draw(st) {
   g.setFontAlign(0, 0);
   drawClock(L);
   L.rows.forEach(function (r, i) {
-    fit(r, 22, w);
+    // during a walk the speed rows leave room for the GPS symbol each side
+    fit(r, 22, st.active ? w - 2 * ICON_W : w);
     g.drawString(r, x, y + 88 + i * 24);
   });
   if (!st.active) return st;
+  drawIcon(gpsIcon());
   // progress bar of the whole walk, with a notch at the turnaround
   var bx = R.x + 6, bw = R.w - 12, by = R.y2 - 16, bh = 12;
   g.drawRect(bx, by, bx + bw - 1, by + bh - 1);
@@ -206,11 +244,12 @@ function start() {
 
 /* Before a walk: set the length (a tap on the idle screen starts it). Back (or the button) returns
    to the idle screen without starting anything. */
-function showIdleMenu() {
+function showIdleMenu(selected) {
   stopTimers();
   screen = "menu";
-  var menu = { "": { title: "BangTurn", back: showMain } };
+  var menu = { "": { title: "BangTurn", back: showMain, selected: selected || 0 } };
   menu["Length: " + bt.getMins() + " min"] = function () { stopMenuTimer(); showPicker(); };
+  menu["Info"] = function () { showInfo(); };
   E.showMenu(menu);
   startMenuTimer();
 }
@@ -258,18 +297,21 @@ function gpsApps() {
 function phoneGPS(src) {
   if (typeof Bangle.moveGPSPower != "function") return "setting off";
   if (!NRF.getSecurityStatus().connected) return "no Bluetooth";
-  return src.from == "phone" ? "working" : "no fixes";
+  if (src.from == "phone") return "working";
+  return bt.isActive() ? "no fixes" : "no walk"; // only asked for during a walk
 }
 
-/* Info (from the walk menu): where the speeds' GPS comes from, whether the
-   watch's own GPS chip (the big battery drain) is on, which apps have asked
-   for GPS, how old the last fix is, and the battery. Tap a row to refresh;
-   back returns to the walk menu. */
+/* Info (from the walk menu, or the start screen's menu): where the speeds'
+   GPS comes from, whether the watch's own GPS chip (the big battery drain)
+   is on, which apps have asked for GPS, how old the last fix is, and the
+   battery. Tap a row to refresh; back returns to the menu it came from. */
 function showInfo(selected) {
   stopTimers();
   screen = "menu"; // same 10 s timeout, and closes if the walk ends
   var src = speed.source();
-  var menu = { "": { title: "Info", back: function () { showWalkMenu(3); }, selected: selected || 0 } };
+  var menu = { "": { title: "Info", selected: selected || 0, back: function () {
+    if (bt.isActive()) showWalkMenu(3); else showIdleMenu(1);
+  } } };
   var n = 0;
   function row(name, value) {
     var i = n++;
@@ -293,6 +335,7 @@ function onLock() { if (screen == "main") tick(); }
 
 Bangle.on("bangturn", onEvent);
 Bangle.on("lock", onLock);
+Bangle.on("GPS", onGPSIcon);
 Bangle.on("touch", onMenuInput);
 Bangle.on("drag", onMenuInput);
 Bangle.drawWidgets();
