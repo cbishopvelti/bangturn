@@ -79,7 +79,9 @@ before a check that needs the watch on your wrist.
    (in the same spot) and the time HH:MM; the start time keeps its seconds.
    No minutes number by the battery inside the app. Swipe right
    (or long-press) back to the clock: the widget shows `60`, and reopening
-   the app shows the right time.
+   the app shows the right time. With the watch unlocked, tap the number by
+   the battery: BangTurn opens. Try taps on its edges and on the widgets next
+   to it, and say if it's too fussy or opens when it shouldn't.
 3. **Button stops the alarm.** Start a turnaround test, go to the clock and
    let the watch lock. When the alarm starts (strong long buzzes, lit screen,
    TURN AROUND), press the button once. The alarm stops at once and the
