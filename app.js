@@ -11,7 +11,7 @@
               with the speed needed to be back at 0, the speed now and the
               difference between them
    Swipe right goes back to the clock. The minutes-left widget is hidden.
-   - menu:    (idle: Length, Info; the button goes back)
+   - menu:    (idle: Length, Info, Units; the button goes back)
               during a walk: Resume, -1 min (offset shown), Cancel walk,
               Info (GPS via phone/watch, Watch GPS chip on/off, Phone GPS
               setup check, the apps holding GPS, last fix, battery); back to the countdown
@@ -39,12 +39,17 @@ function fit(txt, max, w) {
   return s;
 }
 
-/* "5.2", or "--" before there is a speed ("99+" from 100 kph, which is
-   only ever the speed needed in the last seconds). Not toFixed(1):
-   Espruino's doesn't carry, so 4.96 would show as 4.9. */
+/* The speed units setting ("kph" or "mph"), read once here and updated by
+   the Units menu item, so drawing doesn't read Storage every second */
+var units = bt.getUnits();
+
+/* "5.2" (v is in kph: "3.2" with the units set to mph), or "--" before
+   there is a speed ("99+" from 100, which is only ever the speed needed in
+   the last seconds). The units are drawn after it, small (drawRows). Not
+   toFixed(1): Espruino's doesn't carry, so 4.96 would show as 4.9. */
 function kph(v) {
   if (typeof v != "number" || !isFinite(v) || v < 0) return "--";
-  var n = Math.round(v * 10);
+  var n = Math.round(bt.toUnits(v, units) * 10);
   return n >= 1000 ? "99+" : Math.floor(n / 10) + "." + (n % 10);
 }
 
@@ -61,11 +66,12 @@ function nowColour(c) {
   return g.theme.dark ? g.toColor(c, 1, c) : g.toColor(0, 1 - c, 0);
 }
 
-/* The speed now less the speed needed, as shown: "-0.3" when 0.3 kph too
-   slow, "+0.4" when faster than needed, "0.0" on it. From the two numbers
-   as rounded on screen, so the three always add up. */
+/* The speed now less the speed needed (both in kph), as shown: "-0.3" when
+   0.3 too slow, "+0.4" when faster than needed, "0.0" on it. From the two
+   numbers as rounded on screen (so in the units setting), so the three
+   always add up. */
 function diff(now, need) {
-  var n = Math.round(now * 10) - Math.round(need * 10), m = Math.abs(n);
+  var n = Math.round(bt.toUnits(now, units) * 10) - Math.round(bt.toUnits(need, units) * 10), m = Math.abs(n);
   return (n > 0 ? "+" : n < 0 ? "-" : "") + (m >= 1000 ? "99+" : Math.floor(m / 10) + "." + (m % 10));
 }
 
@@ -75,6 +81,15 @@ function tto(km, v) {
   if (typeof km != "number" || typeof v != "number" || !(v > 0)) return "--";
   var ms = km * 3600000 / v;
   return ms < 60000000 ? bt.fmt(ms) : "--";
+}
+
+/* The Units item of both button menus: a tap switches kph <-> mph and
+   redraws the menu (on the same item) */
+function unitsItem(menu, again, i) {
+  menu["Units: " + units] = function () {
+    units = bt.setUnits(units == "kph" ? "mph" : "kph");
+    again(i);
+  };
 }
 
 function pad(n) { return ("0" + n).substr(-2); }
@@ -132,9 +147,10 @@ function lines(st, now) {
     var r = { a: "Now", v: kph(sp.now), w: kph(need), d: "--" };
     if (r.v != "--" && r.w != "--") {
       r.d = diff(sp.now, need);
-      // (never a band under 0.1 kph, the smallest step shown: next to the
+      // (never a band under 0.1, the smallest step shown: next to the
       // origin the speed needed is all but 0)
-      r.c = E.clip((sp.now - need) / Math.max(BAND * need, 0.1), -1, 1);
+      var n = bt.toUnits(sp.now, units), m = bt.toUnits(need, units);
+      r.c = E.clip((n - m) / Math.max(BAND * m, 0.1), -1, 1);
     }
     L.rows.push(r);
   }
@@ -223,7 +239,8 @@ function onGPSIcon(f) {
 
 /* The bottom row: the speed needed after a target symbol, the speed now
    after a speedometer, then the difference, both in the colour that says
-   how they compare (see nowColour), with one "kph" for all three at the end:
+   how they compare (see nowColour), with the units ("kph" or "mph") once
+   for all three at the end:
      (o) 5.2   (/) 4.9   -0.3 kph
    The difference always has room for a sign, so nothing moves as it
    passes 0.0. All three shrink together when one is long (10 kph or more). */
@@ -231,8 +248,8 @@ var GAUGE = atob("DQqBAA+BgxAEgKgMwMYMMEFAEQEA"); // 13x10, 1 bit
 function drawGoal(r, y) {
   var R = Bangle.appRect, x1 = R.x + 3, x2 = R.x2 - 3, IW = 16, s = 22;
   var signed = r.d[0] == "-" || r.d[0] == "+", wide = "+" + (signed ? r.d.substr(1) : r.d);
-  g.setFont("Vector", 12).setFontAlign(1, 0).drawString("kph", x2, y + 2);
-  var kw = g.stringWidth("kph") + 2, ww, tot;
+  g.setFont("Vector", 12).setFontAlign(1, 0).drawString(units, x2, y + 2);
+  var kw = g.stringWidth(units) + 2, ww, tot;
   do {
     g.setFont("Vector", --s);
     ww = g.stringWidth(r.w);
@@ -250,7 +267,8 @@ function drawGoal(r, y) {
      Out   5.2 kph   28:45     label, average speed, time to the origin
      Back  4.9 kph   31:02     (only on the way back, always in this place)
      (o) 5.2  (/) 4.9  -0.3 kph   always the bottom row (see drawGoal)
-   Labels and units are small, the numbers big. */
+   Labels and units are small, the numbers big. The units are the Units
+   setting's: "mph" in place of "kph". */
 function drawRows(rows) {
   var R = Bangle.appRect, y0 = R.y + 77 + TOP, x1 = R.x + 3, x2 = R.x2 - 3;
   var NUM = 22, LBL = 15, SX = R.x + 76; // speeds end at SX
@@ -259,8 +277,8 @@ function drawRows(rows) {
     if (r.d) return drawGoal(r, y);
     g.setFont("Vector", LBL).setFontAlign(-1, 0).drawString(r.a, x1, y + 1);
     g.setFont("Vector", NUM).setFontAlign(1, 0).drawString(r.v, SX, y);
-    g.setFont("Vector", 12).setFontAlign(-1, 0).drawString("kph", SX + 2, y + 2);
-    var kx = SX + 5 + g.stringWidth("kph"); // where the kph ends
+    g.setFont("Vector", 12).setFontAlign(-1, 0).drawString(units, SX + 2, y + 2);
+    var kx = SX + 5 + g.stringWidth(units); // where the units end
     // placed as the whole m:ss, so the minutes don't move when the
     // seconds turn grey (smaller only for a time of 100 minutes or more)
     fit(r.tf, NUM, x2 - kx - 1);
@@ -383,6 +401,7 @@ function showIdleMenu(selected) {
   var menu = { "": { title: "BangTurn", back: showMain, selected: selected || 0 } };
   menu["Length: " + bt.getMins() + " min"] = function () { stopMenuTimer(); showPicker(); };
   menu["Info"] = function () { showInfo(); };
+  unitsItem(menu, showIdleMenu, 2);
   E.showMenu(menu);
   startMenuTimer();
 }
@@ -399,6 +418,7 @@ function showWalkMenu(selected) {
   };
   menu["Cancel walk"] = function () { bt.cancel(); showMain(); };
   menu["Info"] = function () { showInfo(); };
+  unitsItem(menu, showWalkMenu, 4);
   E.showMenu(menu);
   startMenuTimer();
 }

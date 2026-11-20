@@ -1,7 +1,8 @@
 /* BangTurn settings, installed as "bangturn.settings.js": shown under
-   Settings > Apps > BangTurn. One item, the walk length, which opens the
+   Settings > Apps > BangTurn. The walk length, which opens the
    scroll wheel picker (bangturn.picker). A new length applies to the next
-   walk; a walk that is running keeps its own. */
+   walk; a walk that is running keeps its own. And the speed units
+   (kph or mph), switched with a tap. */
 (function (back) {
   var bt = require("bangturn");
   function menu() {
@@ -13,6 +14,10 @@
         bt.setMins(mins);
         menu();
       });
+    };
+    m["Units: " + bt.getUnits()] = function () {
+      bt.setUnits(bt.getUnits() == "kph" ? "mph" : "kph");
+      menu();
     };
     E.showMenu(m);
   }

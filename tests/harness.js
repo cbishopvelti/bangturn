@@ -176,8 +176,8 @@ async function run() {
    tests that only care about the averages: "Out 5.2 kph", "Back -- kph".
    Leaves out the times to the origin and the bottom row (ui.test.js
    checks those); the idle screen's rows are text already. */
-function speedRows(rows) {
-  return rows.filter(r => typeof r == "string" || r.d === undefined).map(r => typeof r == "string" ? r : `${r.a} ${r.v} kph`);
+function speedRows(rows, units) {
+  return rows.filter(r => typeof r == "string" || r.d === undefined).map(r => typeof r == "string" ? r : `${r.a} ${r.v} ${units || "kph"}`);
 }
 
 module.exports = { create, test, assert, run, sleep, speedRows };
