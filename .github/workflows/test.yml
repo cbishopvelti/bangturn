@@ -6,6 +6,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10 # the suite takes well under a minute; this stops a hang
     env:
       BANGLE_DIR: ${{ github.workspace }}/../bangle
     steps:

@@ -95,7 +95,8 @@ test("start in the past skips past events", async h => {
 
 test("entries crossing midnight get tomorrow's date", async h => {
   const now = h.eval("Date.now()");
-  const midnight = (Math.floor(now / 86400000) + 1) * 86400000; // UTC = local here
+  let midnight = (Math.floor(now / 86400000) + 1) * 86400000; // UTC = local here
+  if (midnight - now < 15 * MIN) midnight += 86400000; // keep the turnaround ahead of now
   const start = midnight - 40 * MIN; // walk out before midnight, back after
   h.tx(`${BT}.start(${start})`);
   expectEntries(h, start, ALL);
