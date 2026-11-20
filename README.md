@@ -151,7 +151,7 @@ walk runs the watch's own GPS):
   location must be on too.
 
 Info's **Phone GPS** row (below) says which of these is missing. During a
-walk, the symbol at the right of the Out row shows it at a glance: a phone
+walk, the symbol left of the time of day (top row) shows it at a glance: a phone
 when the speeds come from the phone's GPS, a red crosshair while the watch's
 own GPS chip is on (the battery drain), blank before any GPS.
 

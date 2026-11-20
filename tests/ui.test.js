@@ -452,7 +452,7 @@ test("walk screen: GPS symbol shows phone or watch, and follows GPS events", asy
   await h.wait(100);
   assert.eq(h.eval("drawnIcon"), "watch");
   const R = h.eval("Bangle.appRect");
-  assert.eq(h.eval(`g.getPixel(${R.x2 - 10},${R.y + 88})`), h.eval('g.toColor("#f00")'), "red crosshair centre");
+  assert.eq(h.eval(`g.getPixel(${R.x + 8},${R.y + 12})`), h.eval('g.toColor("#f00")'), "red crosshair centre, left of the time");
   // the symbol survives a full redraw
   h.tx("tick()");
   assert.eq(h.eval("drawnIcon"), "watch");

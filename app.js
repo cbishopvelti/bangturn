@@ -81,10 +81,13 @@ function drawClock(L) {
   var R = Bangle.appRect, y = R.y + 12;
   g.reset().clearRect(R.x, y - 11, R.x2, y + 11);
   if (L.start) {
+    // during a walk the GPS symbol sits left of the time, which always
+    // starts just after it, so the time never moves
     var hw = R.w / 2 - 4;
-    g.setFont("Vector", Math.min(fit(L.now, 18, hw), fit(L.start, 18, hw)));
-    g.setFontAlign(-1, 0).drawString(L.now, R.x + 3, y);
+    g.setFont("Vector", Math.min(fit(L.now, 18, hw - ICON_W - 2), fit(L.start, 18, hw)));
+    g.setFontAlign(-1, 0).drawString(L.now, R.x + ICON_W + 4, y);
     g.setFontAlign(1, 0).drawString(L.start, R.x2 - 3, y);
+    drawIcon(gpsIcon());
   } else {
     fit(L.now, 20, R.w - 4);
     g.setFontAlign(0, 0).drawString(L.now, R.x + R.w / 2, y);
@@ -92,12 +95,12 @@ function drawClock(L) {
   g.setFontAlign(0, 0);
 }
 
-/* The GPS symbol at the right of the Out row during a walk: where the speeds'
-   GPS comes from, from the same facts as Info.
+/* The GPS symbol left of the time of day (top row) during a walk: where the
+   speeds' GPS comes from, from the same facts as Info.
    "watch": the watch's own GPS chip is on (red: the big battery drain);
    "phone": the phone's fixes are arriving and the chip is off;
    "": no GPS yet. Redrawn on its own when it changes (see onGPSIcon). */
-var ICON_W = 18;
+var ICON_W = 16;
 var drawnIcon; // the symbol on screen now
 function gpsIcon(s) {
   s = s || speed.source();
@@ -105,17 +108,17 @@ function gpsIcon(s) {
 }
 function drawIcon(k) {
   drawnIcon = k;
-  var R = Bangle.appRect, cx = R.x2 - ICON_W / 2 - 1, cy = R.y + 88;
-  g.reset().clearRect(R.x2 - ICON_W, cy - 11, R.x2, cy + 11);
+  var R = Bangle.appRect, cx = R.x + ICON_W / 2, cy = R.y + 12;
+  g.reset().clearRect(R.x, cy - 10, R.x + ICON_W, cy + 10);
   if (k == "phone") { // a phone: rounded body, screen, button
-    g.drawRect({ x: cx - 6, y: cy - 10, w: 13, h: 21, r: 3 })
-      .drawRect(cx - 4, cy - 7, cx + 4, cy + 4)
+    g.drawRect({ x: cx - 5, y: cy - 9, w: 11, h: 19, r: 2 })
+      .drawRect(cx - 3, cy - 6, cx + 3, cy + 4)
       .fillRect(cx - 1, cy + 6, cx + 1, cy + 7);
   } else if (k == "watch") { // a GPS crosshair, in red
     g.setColor(g.theme.dark ? "#f44" : "#f00")
-      .drawCircle(cx, cy, 6).drawCircle(cx, cy, 5).fillCircle(cx, cy, 2)
-      .fillRect(cx - 9, cy, cx - 6, cy).fillRect(cx + 6, cy, cx + 9, cy)
-      .fillRect(cx, cy - 9, cx, cy - 6).fillRect(cx, cy + 6, cx, cy + 9);
+      .drawCircle(cx, cy, 5).drawCircle(cx, cy, 4).fillCircle(cx, cy, 1)
+      .fillRect(cx - 8, cy, cx - 5, cy).fillRect(cx + 5, cy, cx + 8, cy)
+      .fillRect(cx, cy - 8, cx, cy - 5).fillRect(cx, cy + 5, cx, cy + 8);
   }
 }
 /* GPS events already wake the watch (the speed tracker listens), so the
@@ -133,7 +136,7 @@ function draw(st) {
   var L = lines(st);
   var R = Bangle.appRect, x = R.x + R.w / 2, w = R.w - 4, y = R.y;
   g.reset().clearRect(R).setFontAlign(0, 0);
-  drawnIcon = undefined; // drawn again below during a walk
+  drawnIcon = undefined; // drawn again with the time row during a walk
   // sized and placed as the full m:ss, so the minutes don't move when the
   // seconds are left off
   fit(L.full, 46, w);
@@ -141,12 +144,10 @@ function draw(st) {
   g.setFontAlign(0, 0);
   drawClock(L);
   L.rows.forEach(function (r, i) {
-    // during a walk the speed rows leave room for the GPS symbol each side
-    fit(r, 22, st.active ? w - 2 * ICON_W : w);
+    fit(r, 22, w);
     g.drawString(r, x, y + 88 + i * 24);
   });
   if (!st.active) return st;
-  drawIcon(gpsIcon());
   // progress bar of the whole walk, with a notch at the turnaround
   var bx = R.x + 6, bw = R.w - 12, by = R.y2 - 16, bh = 12;
   g.drawRect(bx, by, bx + bw - 1, by + bh - 1);
