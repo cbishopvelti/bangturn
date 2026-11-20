@@ -4,12 +4,12 @@
 
 ## Purpose
 
-Tell you when to turn around on an out-and-back walk. Press start when you set off on a one-hour walk. At the halfway point, 30 minutes in, the watch vibrates so you know to turn around.
+Tell you when to turn around on an out-and-back walk. Start it when you set off on a one-hour walk. At the halfway point, 30 minutes in, the watch vibrates so you know to turn around.
 
 ## Core flow
 
 1. Open BangTurn from the launcher. The screen shows the time of day, `60:00` under it and a **Start** prompt.
-2. Press the button (or tap Start). The one-hour countdown begins and the watch confirms with one short buzz.
+2. Tap the screen (or press the button and pick **Start walk**). The one-hour countdown begins and the watch confirms with one short buzz.
 3. You can leave the app and go back to the clock. The timer keeps running in the background.
 4. When the countdown reaches 30 minutes left, the watch vibrates with a distinct pattern and shows **TURN AROUND**.
 5. The alarm stops as soon as the watch unlocks (you raise your wrist to look, press the button or tap), or after 6 seconds, whichever comes first.
@@ -27,7 +27,7 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 
 | State | Screen | Button | Touch |
 |---|---|---|---|
-| Idle | Time of day (HH:MM:SS) at the top, the walk length (`60:00`), "Press to start", "< Swipe: length" | Start | Tap: start. Swipe left: walk length picker. Swipe right: back to the clock |
+| Idle | Time of day (HH:MM:SS) at the top, the walk length (`60:00`), "Tap to start", "< Swipe: length" | Opens a menu: **Start walk**, **Length** (the picker). The button never starts a walk on its own; in the menu it goes back to the idle screen, as does 10 s with no input | Tap: start. Swipe left: walk length picker. Swipe right: back to the clock |
 | Running | At the top a small row with the time of day (HH:MM:SS) on the left and the walk's start time ("Start HH:MM:SS", moved earlier by any −1 min taps, always with seconds since it never changes) on the right; big countdown of the whole walk in minutes and seconds (`48:00`, no hours), with the seconds left off while the watch is locked (`48`, drawn in the same place and size so the minutes don't move); average speed row(s) in kph (see Speed), with a Back row once you've turned around; progress bar with a notch at the turnaround | Short press: opens a menu with **Resume**, **−1 min** and **Cancel walk**. Long press: Bangle default (back to clock, walk keeps running) | Swipe right: back to the clock (walk keeps running) |
 | Menu | List: Resume, −1 min (shows current offset, e.g. "−1 min (−3)"), Cancel walk, then two info rows: **GPS via** (phone, watch or none yet: where the last GPS fix came from) and **Watch GPS** (ON/off: whether the watch's own GPS chip is powered) | Selects | Tap an item. Resume (or no input for 10 s) goes back to the countdown. −1 min moves the start time 1 minute earlier per tap and stays in the menu. Cancel walk clears all BangTurn `sched` timers and returns to idle |
 | Alert | "TURN AROUND", full-screen high contrast | Stops alarm | Tap: stops alarm |

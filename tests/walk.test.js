@@ -96,7 +96,7 @@ async function startInApp(h) {
 test("a whole walk: start, turnaround alarm, countdown buzzes, silent end", async h => {
   await record(h);
   await h.load("bangturn.app.js");
-  assert.eq(screen(h), { time: "60:00", rows: ["Press to start", "< Swipe: length"] }, "idle screen");
+  assert.eq(screen(h), { time: "60:00", rows: ["Tap to start", "< Swipe: length"] }, "idle screen");
   assert.eq(widget(h), 0, "no widget when idle");
   assert(!gpsOn(h), "GPS off when idle");
 
@@ -212,6 +212,26 @@ test("-1 min from the menu across the turnaround: no alarm, way back rows", asyn
   assert.eq(buzzes(h), [200], "15 min left buzz");
 });
 
+test("button on the idle screen opens the menu, a second press goes back, no walk", async h => {
+  await record(h);
+  await h.load("bangturn.app.js");
+  h.tx("Bangle.setLocked(false)");
+  spyMenu(h);
+  await press(h);
+  assert.eq(h.eval("screen"), "menu", "button opens the idle menu");
+  assert.eq(menuItems(h), ["Start walk", "Length: 60 min"]);
+  await press(h);
+  await h.wait(100);
+  assert.eq(h.eval("screen"), "main", "button goes back to the idle screen");
+  assert.eq(state(h), {}, "no walk started");
+  assert.eq(buzzes(h), [], "no start buzz");
+  await press(h);
+  pick(h, "Start walk");
+  await h.wait(200);
+  assert(h.eval(`${BT}.isActive()`), "Start walk starts it");
+  assert.eq(buzzes(h), [100], "start buzz");
+});
+
 test("cancel from the menu mid-walk stops everything", async h => {
   await record(h);
   await startInApp(h);
@@ -228,7 +248,7 @@ test("cancel from the menu mid-walk stops everything", async h => {
   assert.eq(speeds(h), { out: null, back: null });
   assert(h.eval("EV").includes("cancel"));
   assert.eq(h.eval("screen"), "main");
-  assert.eq(screen(h), { time: "60:00", rows: ["Press to start", "< Swipe: length"] });
+  assert.eq(screen(h), { time: "60:00", rows: ["Tap to start", "< Swipe: length"] });
   assert.eq(widget(h), 0, "widget hidden");
   clearLog(h);
   await h.wait(4500);
