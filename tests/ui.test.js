@@ -541,6 +541,9 @@ test("Info's Phone GPS names the first missing link", async h => {
   h.tx('Bangle.emit("GPS",{fix:1,lat:51.5,lon:-0.12,hdop:1,satellites:8,time:new Date(),externalSource:true})');
   await h.wait(50);
   assert.eq(phone(), "working");
+  // the phone's fixes have stopped and BangTurn is holding the watch's GPS off
+  h.tx('(function(sp){var f=sp.source;sp.source=function(){var s=f();s.wait=true;return s}})(require("bangturn.speed"))');
+  assert.eq(phone(), "waiting");
 });
 
 test("Info from the start screen's menu, and back to that menu", async h => {

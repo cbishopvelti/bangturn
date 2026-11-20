@@ -52,6 +52,7 @@ var MIN_MS = 10000;   // tracked time a half needs before it has an average
 var SAVE_MS = 60000;  // save to Storage at most this often
 var TRAIL_MS = 300000; // ...and the trail at most this often
 var END_MARGIN = 1500; // after the walk's end, GPS goes off by this (ms)
+var PHONE_FRESH = 120000; // the phone "was supplying GPS" if its last fix is newer (ms)
 var KM_PER_DEG = 111.195;
 var NOW_MS = 20000;   // the speed "now" is measured over the last 20 s of fixes
 var NOW_MIN = 5000;   // ...and needs at least 5 s of them
@@ -72,6 +73,7 @@ var MAXC = 512;       // points kept: a longer trail is thinned to every other o
      la, lo, lt,     position and time (ms) of the last good fix
      gt,             true if lt is GPS time, false if it is the watch's clock
      rej,            jumps in a row so far
+     ph,             when the phone last sent a fix (ms, the watch's clock)
      oa, oo,         the origin: where the trail home starts (lat, lon)
      cd }            m between the trail's points now (CRUMB, doubled per thinning) */
 var S;
@@ -94,6 +96,8 @@ var N = 0;          // points on the trail
 var KX;             // m per degree of longitude at the origin
 var px, py;         // where you are (the last good fix), in the trail's metres
 var sx, sy;         // where the trail was last looked through from
+var origMove;       // Android Integration's Bangle.moveGPSPower, while phoneFirst is in
+var holdTimer;      // pending: the watch's own GPS comes on unless the phone sends a fix
 
 /* Save the state. quick: leave the trail's file as it is. */
 function save(quick) {
@@ -109,9 +113,60 @@ function listen() {
   armEnd();
   if (tracking) return;
   tracking = true;
+  phoneFirst();
   Bangle.setGPSPower(1, "bangturn");
+  // Android Integration has just powered the watch's GPS, as it does on
+  // every app load until the phone's next fix. If the phone was supplying
+  // GPS a moment ago, wait for it instead.
+  if (origMove && S && Date.now() - S.ph < PHONE_FRESH && btUp()) hold();
   Bangle.on("GPS", onGPS);
   E.on("kill", save);
+}
+
+/* ---- Phone GPS first (Android Integration's "Overwrite GPS") ----
+   The android app turns the watch's own GPS chip back on the moment a phone
+   fix is later than the gap between the last two fixes plus 1 s. Gadgetbridge
+   sends fixes from two providers (GPS and network), so two often arrive
+   together and the next looks late; a phone sitting still sends them
+   irregularly. The chip then flaps on and off all walk, which is the drain
+   the phone's GPS is there to avoid. So during a walk BangTurn steps in:
+   while the phone is connected, the chip only comes on after exports.PHONE_WAIT
+   with no phone fix. With no Bluetooth it comes on at once, as before. */
+exports.PHONE_WAIT = 60000;
+
+function btUp() { return !!NRF.getSecurityStatus().connected; }
+
+/* Chip off now; on after PHONE_WAIT unless a phone fix comes first (the
+   android app then calls moveGPSPower(0), which cancels this). */
+function hold() {
+  if (holdTimer) clearTimeout(holdTimer);
+  origMove(0);
+  holdTimer = setTimeout(function () { holdTimer = undefined; origMove(1); }, exports.PHONE_WAIT);
+}
+/* Give the chip back at once if a hold is pending (no-op if no app wants GPS) */
+function release() {
+  if (!holdTimer) return;
+  clearTimeout(holdTimer);
+  holdTimer = undefined;
+  origMove(1);
+}
+function phoneFirst() {
+  if (origMove || typeof Bangle.moveGPSPower != "function") return;
+  origMove = Bangle.moveGPSPower;
+  Bangle.moveGPSPower = function (on) {
+    if (on && btUp()) return hold();
+    if (holdTimer) clearTimeout(holdTimer);
+    holdTimer = undefined;
+    origMove(on);
+  };
+  NRF.on("disconnect", release); // the phone has gone: don't wait for it
+}
+function phoneFirstOff() {
+  if (!origMove) return;
+  release(); // another app may still want GPS
+  NRF.removeListener("disconnect", release);
+  Bangle.moveGPSPower = origMove;
+  origMove = undefined;
 }
 
 /* GPS is the biggest drain on the battery, so it must go off when the walk's
@@ -140,6 +195,7 @@ function stop() {
     E.removeListener("kill", save);
   }
   Bangle.setGPSPower(0, "bangturn");
+  phoneFirstOff();
   save();
 }
 
@@ -295,6 +351,7 @@ function onGPS(f) {
   // externalSource; the watch's own GPS sends an event a second, fix or not
   src = f.externalSource ? "phone" : "watch";
   srcAt = Date.now();
+  if (f.externalSource && S) { S.ph = srcAt; dirty = true; }
   if (f.fix && !isNaN(f.lat) && !isNaN(f.lon)) fixAt = srcAt;
   // The walk is over. The core's "end" follows, but never leave GPS on.
   if (el >= DUR) return stop();
@@ -474,6 +531,7 @@ exports.fmt = function (kph) {
    the watch that the phone is supplying it:
    { from: "phone"|"watch"|null (no GPS event in the last SRC_MS),
      chip: true while the watch's own GPS chip is powered,
+     wait: true while the chip is held off, waiting for the phone's next fix,
      fixAge: ms since the last GPS event with a position, or null if none
        this walk (since the app loaded) }.
    chip asks the firmware (Bangle.getGPSFix() is undefined when the chip is
@@ -482,6 +540,6 @@ exports.fmt = function (kph) {
 var SRC_MS = 30000;
 exports.source = function () {
   var fresh = srcAt !== undefined && Date.now() - srcAt < SRC_MS;
-  return { from: fresh ? src : null, chip: Bangle.getGPSFix() !== undefined,
+  return { from: fresh ? src : null, chip: Bangle.getGPSFix() !== undefined, wait: !!holdTimer,
     fixAge: fixAt === undefined ? null : Date.now() - fixAt };
 };
