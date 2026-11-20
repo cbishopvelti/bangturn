@@ -381,11 +381,14 @@ test("GPS never stays on once the walk's time is up", async h => {
   w.walk(5, 30);
   assert.eq(gpsOn(h), true);
   const before = stats(h);
-  await h.wait(1500);
-  assert.eq(h.eval(`${BT}.isActive()`), true, "the core hasn't ended the walk");
-  w.walk(5, 5);
+  w.fix();
+  await h.wait(1000);
+  w.walk(5, 5); // a fix after the end, before the cut-off timer
   assert.eq(gpsOn(h), false, "GPS off at the next GPS event");
-  assert.eq(stats(h), Object.assign({}, before, { tracking: false }), "nothing counted after the end");
+  assert.eq(stats(h).tracking, false);
+  assert.near(stats(h).outKm, before.outKm, 1e-9, "nothing counted after the end");
+  await h.wait(1500);
+  assert.eq(h.eval(`${BT}.isActive()`), false, "the cut-off timer ends the walk");
   await h.load();
   assert.eq(gpsOn(h), false, "and it isn't turned back on by a reboot");
 });

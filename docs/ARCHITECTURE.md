@@ -185,8 +185,12 @@ How it tracks:
 
 - GPS power is `Bangle.setGPSPower(1, "bangturn")` from the `"start"` event
   (or from boot, if a walk is running) until `"end"` or `"cancel"`. As a
-  safety net it also turns GPS off by itself once the walk's hour is up, and
-  boot doesn't turn it on for a walk whose time has passed.
+  safety net it also turns GPS off by itself once the walk's time is up: at
+  the next GPS event, and in any case 1.5 s after the end by its own timer,
+  which also ends the walk if the core's `"end"` wake-up never came (with
+  phone GPS or no signal there may be no GPS events at all). Boot doesn't
+  turn it on for a walk whose time has passed. The widget and the app also
+  end such a walk instead of redrawing a 0 every second.
 - A fix counts if it has a position and an HDOP of 5 or better. A fix that
   implies more than 15 kph since the last good one is a jump and is ignored;
   after 5 jumps in a row tracking restarts from the new position, leaving
