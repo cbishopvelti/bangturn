@@ -10,9 +10,9 @@
               progress bar
    Swipe right goes back to the clock. The minutes-left widget is hidden.
    - menu:    (idle: Start walk, Length; the button goes back)
-              during a walk: Resume, -1 min (offset shown), Cancel walk, then GPS via
-              (phone/watch) and Watch GPS (the chip on/off); back to the
-              countdown after 10 s with no input
+              during a walk: Resume, -1 min (offset shown), Cancel walk,
+              Info (GPS via phone/watch, Watch GPS chip on/off, last fix,
+              battery); back to the countdown after 10 s with no input
    Keep the startup alert hook at the bottom (see docs/ARCHITECTURE.md). */
 var bt = require("bangturn");
 var alerts = require("bangturn.alerts");
@@ -226,11 +226,32 @@ function showWalkMenu(selected) {
     if (bt.isActive()) showWalkMenu(1); else showMain();
   };
   menu["Cancel walk"] = function () { bt.cancel(); showMain(); };
-  // where the speeds' GPS comes from, and whether the watch's own GPS chip
-  // (the big battery drain) is on; tap either to refresh
+  menu["Info"] = function () { showInfo(); };
+  E.showMenu(menu);
+  startMenuTimer();
+}
+
+/* "34s ago" / "5m ago" for an age in ms */
+function ago(ms) {
+  var s = Math.round(ms / 1000);
+  return s < 60 ? s + "s ago" : Math.floor(s / 60) + "m ago";
+}
+
+/* Info (from the walk menu): where the speeds' GPS comes from, whether the
+   watch's own GPS chip (the big battery drain) is on, how old the last fix
+   is, and the battery. Tap a row to refresh; back returns to the walk menu. */
+function showInfo(selected) {
+  stopTimers();
+  screen = "menu"; // same 10 s timeout, and closes if the walk ends
   var src = speed.source();
-  menu["GPS via"] = { value: src.from || "none yet", onchange: function () { showWalkMenu(3); } };
-  menu["Watch GPS"] = { value: src.chip ? "ON" : "off", onchange: function () { showWalkMenu(4); } };
+  var menu = { "": { title: "Info", back: function () { showWalkMenu(3); }, selected: selected || 0 } };
+  function row(name, value, i) {
+    menu[name] = { value: value, onchange: function () { showInfo(i); } };
+  }
+  row("GPS via", src.from || "none yet", 0);
+  row("Watch GPS", src.chip ? "ON" : "off", 1);
+  row("Last fix", src.fixAge === null ? "none" : ago(src.fixAge), 2);
+  row("Battery", E.getBattery() + "%", 3);
   E.showMenu(menu);
   startMenuTimer();
 }

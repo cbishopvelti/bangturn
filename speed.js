@@ -53,6 +53,7 @@ var dirty = false;  // S has changed since it was saved
 var saved;          // fix time of the last save
 var endTimer;       // fires just after the walk's end (see armEnd)
 var src, srcAt;     // where the last GPS event came from ("phone"/"watch"), and when
+var fixAt;          // when the last GPS event with a position came (any HDOP)
 
 function save() {
   if (!dirty || !S) return;
@@ -131,6 +132,7 @@ function onGPS(f) {
   // externalSource; the watch's own GPS sends an event a second, fix or not
   src = f.externalSource ? "phone" : "watch";
   srcAt = Date.now();
+  if (f.fix && !isNaN(f.lat) && !isNaN(f.lon)) fixAt = srcAt;
   // The walk is over. The core's "end" follows, but never leave GPS on.
   if (el >= DUR) return stop();
   if (!f.fix || isNaN(f.lat) || isNaN(f.lon) || f.hdop > HDOP_MAX) return;
@@ -242,15 +244,18 @@ exports.fmt = function (kph) {
   return Math.floor(n / 10) + "." + (n % 10) + " kph";
 };
 
-/* Where GPS is coming from, for the walk menu, so you can check on the
-   watch that the phone is supplying it:
+/* Where GPS is coming from, for the walk menu's Info, so you can check on
+   the watch that the phone is supplying it:
    { from: "phone"|"watch"|null (no GPS event in the last SRC_MS),
-     chip: true while the watch's own GPS chip is powered }.
+     chip: true while the watch's own GPS chip is powered,
+     fixAge: ms since the last GPS event with a position, or null if none
+       this walk (since the app loaded) }.
    chip asks the firmware (Bangle.getGPSFix() is undefined when the chip is
    off), not Bangle.isGPSOn(), which Android Integration replaces with
    "has any app asked for GPS" when it overwrites GPS. */
 var SRC_MS = 30000;
 exports.source = function () {
   var fresh = srcAt !== undefined && Date.now() - srcAt < SRC_MS;
-  return { from: fresh ? src : null, chip: Bangle.getGPSFix() !== undefined };
+  return { from: fresh ? src : null, chip: Bangle.getGPSFix() !== undefined,
+    fixAge: fixAt === undefined ? null : Date.now() - fixAt };
 };

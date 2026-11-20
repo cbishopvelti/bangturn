@@ -129,7 +129,7 @@ test("phone GPS: the watch's GPS is off while the phone sends fixes; cancel turn
   await h.wait(100);
   assert.eq(hw(h), false, "watch GPS off while the phone sends fixes");
   assert.eq(h.eval(`require("bangturn.speed").stats().tracking`), true);
-  assert.eq(h.eval(`require("bangturn.speed").source()`), { from: "phone", chip: false }, "what the menu shows");
+  assert.eq(h.eval(`(function(s){return [s.from,s.chip]})(require("bangturn.speed").source())`), ["phone", false], "what Info shows");
   h.tx(`${BT}.cancel()`);
   await h.wait(100);
   assert.eq(hw(h), false, "watch GPS off");
