@@ -56,16 +56,19 @@ function hms(t, secs) {
    now: time of day, with seconds while unlocked. Locked, it's HH:MM and
    dim holds the seconds (":37"), drawn grey after it: locked redraws only
    once a minute, so they are the seconds of the last redraw (the lock, then
-   ":00" on each minute) and don't tick. start: the walk's start time,
-   moved earlier by any -1 min taps, always with seconds (it's fixed, so
+   ":00" on each minute) and don't tick. The countdown does the same with
+   time and timeDim (the lock, then ":59" as each minute starts).
+   start: the walk's start time, moved earlier by any -1 min taps, always with seconds (it's fixed, so
    they never go stale). */
 function lines(st, now) {
   if (now === undefined) now = Date.now();
   var locked = Bangle.isLocked();
-  // locked redraws once a minute, so drop the seconds that would freeze:
-  // full is the whole m:ss (for layout), time what is drawn ("47" of "47:30")
-  var full = bt.fmt(st.remaining);
-  var L = { full: full, time: st.active && locked ? "" + bt.mins(st.remaining) : full, rows: [] };
+  // locked redraws once a minute, so the seconds would freeze: they are
+  // drawn grey. full is the whole m:ss (for layout), time the black part
+  // ("47" of "47:30") and timeDim the grey part (":30")
+  var full = bt.fmt(st.remaining), dimTime = st.active && locked;
+  var L = { full: full, time: dimTime ? "" + bt.mins(st.remaining) : full, rows: [] };
+  L.timeDim = dimTime ? full.substr(full.indexOf(":")) : "";
   L.now = hms(now, !locked);
   L.dim = locked ? hms(now, true).substr(5) : "";
   L.nowFull = hms(now, true); // for layout, so HH:MM doesn't move when locked
@@ -100,12 +103,13 @@ function drawClock(L) {
   }
   g.setFontAlign(0, 0);
 }
-/* The time of day from x, with the locked seconds in grey. The 3-bit
+function drawNow(L, x, y) { drawDim(L.now, L.dim, x, y); }
+/* s from x in the text colour, then dim (locked seconds) in grey. The 3-bit
    screen dithers grey; a half-and-half #888 loses the small walk-screen
    digits, so it leans towards the text colour. */
-function drawNow(L, x, y) {
-  g.setFontAlign(-1, 0).drawString(L.now, x, y);
-  if (L.dim) g.setColor(g.theme.dark ? "#aaa" : "#555").drawString(L.dim, x + g.stringWidth(L.now), y).setColor(g.theme.fg);
+function drawDim(s, dim, x, y) {
+  g.setFontAlign(-1, 0).drawString(s, x, y);
+  if (dim) g.setColor(g.theme.dark ? "#aaa" : "#555").drawString(dim, x + g.stringWidth(s), y).setColor(g.theme.fg);
 }
 
 /* The GPS symbol left of the time of day (top row) during a walk: where the
@@ -160,9 +164,9 @@ function draw(st) {
   g.reset().clearRect(R).setFontAlign(0, 0);
   drawnIcon = undefined; // drawn again with the time row during a walk
   // sized and placed as the full m:ss, so the minutes don't move when the
-  // seconds are left off
+  // seconds turn grey
   fit(L.full, 46, w);
-  g.setFontAlign(-1, 0).drawString(L.time, x - g.stringWidth(L.full) / 2, y + 48);
+  drawDim(L.time, L.timeDim, x - g.stringWidth(L.full) / 2, y + 48);
   g.setFontAlign(0, 0);
   drawClock(L);
   L.rows.forEach(function (r, i) {
