@@ -11,8 +11,8 @@
    Swipe right goes back to the clock. The minutes-left widget is hidden.
    - menu:    (idle: Length; the button goes back)
               during a walk: Resume, -1 min (offset shown), Cancel walk,
-              Info (GPS via phone/watch, Watch GPS chip on/off, the apps
-              holding GPS, last fix, battery); back to the countdown
+              Info (GPS via phone/watch, Watch GPS chip on/off, Phone GPS
+              setup check, the apps holding GPS, last fix, battery); back to the countdown
               after 10 s with no input
    Keep the startup alert hook at the bottom (see docs/ARCHITECTURE.md). */
 var bt = require("bangturn");
@@ -246,6 +246,21 @@ function gpsApps() {
   return l && l.length ? l.join(", ") : "none";
 }
 
+/* Why the phone isn't (or is) supplying GPS, for Info. The phone's GPS
+   needs three links, and this names the first one missing:
+   - Android Integration's "Overwrite GPS" on: it then defines
+     Bangle.moveGPSPower and passes GPS requests to the phone.
+   - Bluetooth connected to Gadgetbridge.
+   - Gadgetbridge sending fixes: its Bangle.js device setting "Use phone gps
+     data" (off by default), and location permission plus "Keep location
+     updated" (Gadgetbridge Settings > Location > Acquire location). The
+     watch can't read those, so if fixes don't come it says "no fixes". */
+function phoneGPS(src) {
+  if (typeof Bangle.moveGPSPower != "function") return "setting off";
+  if (!NRF.getSecurityStatus().connected) return "no Bluetooth";
+  return src.from == "phone" ? "working" : "no fixes";
+}
+
 /* Info (from the walk menu): where the speeds' GPS comes from, whether the
    watch's own GPS chip (the big battery drain) is on, which apps have asked
    for GPS, how old the last fix is, and the battery. Tap a row to refresh;
@@ -262,6 +277,7 @@ function showInfo(selected) {
   }
   row("GPS via", src.from || "none yet");
   row("Watch GPS", src.chip ? "ON" : "off");
+  row("Phone GPS", phoneGPS(src));
   row("GPS apps", gpsApps());
   row("Last fix", src.fixAge === null ? "none" : ago(src.fixAge));
   row("Battery", E.getBattery() + "%");

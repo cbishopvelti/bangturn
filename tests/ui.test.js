@@ -346,7 +346,7 @@ test("Info: where GPS comes from, whether the watch's chip is on, last fix, batt
   spyMenu(h);
   h.tx("showWalkMenu()");
   h.tx('MENU["Info"]()');
-  assert.eq(menuItems(h), ["GPS via", "Watch GPS", "GPS apps", "Last fix", "Battery"]);
+  assert.eq(menuItems(h), ["GPS via", "Watch GPS", "Phone GPS", "GPS apps", "Last fix", "Battery"]);
   assert.eq(h.eval("screen"), "menu", "the menu's timeout applies");
   assert.eq(h.eval('MENU["GPS via"].value'), "none yet");
   assert.eq(h.eval('MENU["Watch GPS"].value'), "off");
@@ -362,7 +362,7 @@ test("Info: where GPS comes from, whether the watch's chip is on, last fix, batt
   assert.eq(h.eval('MENU["Last fix"].value'), "1s ago");
   assert.eq(h.eval('MENU[""].selected'), 1, "stays on the row tapped");
   h.tx('MENU["Last fix"].onchange()');
-  assert.eq(h.eval('MENU[""].selected'), 3);
+  assert.eq(h.eval('MENU[""].selected'), 4);
   // the watch's own GPS, searching (no position: Last fix unchanged)
   h.tx('Bangle.emit("GPS",{fix:0,lat:NaN,lon:NaN,satellites:0,time:new Date()})');
   await h.wait(50);
@@ -398,8 +398,24 @@ test("Info lists the apps holding GPS", async h => {
   h.tx('Bangle._PWR={HRM:["health"]}');
   h.tx('MENU["GPS apps"].onchange()');
   assert.eq(h.eval('MENU["GPS apps"].value'), "none");
-  assert.eq(h.eval('MENU[""].selected'), 2, "stays on the row tapped");
+  assert.eq(h.eval('MENU[""].selected'), 3, "stays on the row tapped");
   h.tx('delete Bangle._PWR');
   h.tx('MENU["GPS apps"].onchange()');
   assert.eq(h.eval('MENU["GPS apps"].value'), "none");
+});
+
+test("Info's Phone GPS names the first missing link", async h => {
+  h.tx(`${BT}.start(${h.eval("Date.now()") - 5 * MIN})`);
+  await h.load("bangturn.app.js");
+  spyMenu(h);
+  const phone = () => { h.tx("showInfo()"); return h.eval('MENU["Phone GPS"].value'); };
+  assert.eq(phone(), "setting off", "no Android Integration Overwrite GPS");
+  h.tx("Bangle.moveGPSPower=function(){}"); // what Overwrite GPS defines
+  h.tx("NRF.getSecurityStatus=function(){return {connected:false}}");
+  assert.eq(phone(), "no Bluetooth");
+  h.tx("NRF.getSecurityStatus=function(){return {connected:true}}");
+  assert.eq(phone(), "no fixes", "connected, but Gadgetbridge sends nothing");
+  h.tx('Bangle.emit("GPS",{fix:1,lat:51.5,lon:-0.12,hdop:1,satellites:8,time:new Date(),externalSource:true})');
+  await h.wait(50);
+  assert.eq(phone(), "working");
 });
