@@ -3,7 +3,8 @@
    no timers when idle. Hidden (width 0, no timers) inside the BangTurn
    app, which calls WIDGETS.bangturn.hide(). Redraws on "bangturn" events and once a minute,
    aligned to the moment the displayed number changes, so it wakes the CPU
-   at most once a minute. Idle cost: one small Storage read at load.
+   at most once a minute. A tap on the number on a clock face opens the app.
+   Idle cost: one small Storage read at load.
    See docs/ARCHITECTURE.md. */
 (function () {
   var W = 28, to, hidden;
@@ -47,6 +48,19 @@
         .drawString(m, this.x + W / 2, this.y + 12);
     }
   };
+  /* A tap on the number opens BangTurn. Only on a clock face, while the number
+     is drawn (walk running, not hidden inside the app, widget bar showing).
+     The target is the widget's box plus a few pixels to the sides, where the
+     neighbours are, and down into the top of the clock, which uses taps there
+     least. Touches only register while the watch is unlocked. */
+  Bangle.on("touch", function (b, e) {
+    var wd = WIDGETS.bangturn;
+    if (hidden || !wd.width || wd.x === undefined || !e || !Bangle.CLOCK) return;
+    if (Bangle.appRect && Bangle.appRect.y < 24) return; // widget bar hidden
+    if (e.x < wd.x - 4 || e.x > wd.x + W + 3 || e.y < wd.y || e.y > wd.y + 35) return;
+    if (E.stopEventPropagation) E.stopEventPropagation();
+    load("bangturn.app.js");
+  });
   Bangle.on("bangturn", update);
   update();
 })();
