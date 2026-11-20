@@ -18,7 +18,10 @@ BANGLE_DIR=~/bangle sh tests/setup-emulator.sh
 npm test                                   # all tests/*.test.js
 node tests/run.js tests/core.test.js -v    # one file, with the watch's console
 node tests/run.js --grep=reboot            # tests whose name contains "reboot"
+BANGTURN_TEST_TIME=2026-06-15T23:58:00Z npm test   # run at another time of day
 ```
+
+The whole suite takes about 10 seconds.
 
 Set `BANGLE_DIR` if the emulator isn't in `/opt/bangle`. GitHub Actions runs
 the same on every pull request (`.github/workflows/test.yml`).
@@ -32,18 +35,27 @@ test("what it checks", async h => {
   h.tx('require("bangturn").start()');               // run code on the watch
   assert.eq(h.eval('require("bangturn").status().phase'), "out");
   await h.load("bangturn.app.js");                    // load an app and wait for it
-  await h.wait(1500);                                 // let real time pass
+  await h.wait(1500);                                 // let 1.5 s pass on the watch
 });
 ```
 
-- Each test starts with a fresh emulator, BangTurn and the latest `sched`
-  installed, and boot code run (`load()`), like a freshly booted watch.
+- Each test starts from a freshly booted watch: BangTurn and the latest
+  `sched` installed and boot code run (`load()`). The harness boots once,
+  snapshots the watch's RAM and flash, and restores that for every test.
+- The watch's clock is virtual (`tests/emulator.js`). It stands still while
+  the watch runs a command and only moves in `h.wait(ms)`, which runs the
+  watch's timers as they fall due, so a 6 s wait takes no real time and every
+  run sees exactly the same times. Every test starts at 10:00:00 UTC on
+  15 June 2026 (plus the boot), well away from minute and day boundaries.
+  `BANGTURN_TEST_TIME` (any time `Date.parse` reads) starts it elsewhere, to
+  check a change near midnight, say.
 - `h.eval(js)` returns the value (through JSON). `h.tx(js)` ignores it.
 - `h.load()` with no file loads the clock, which is how to simulate a reboot
   or leaving the app.
-- The emulator clock can't be moved forward, so test timing by starting a
-  walk in the past (`start(Date.now() - 45*60000)`), and real firing with
-  events a second or two away.
+- `h.wait()` can pass any amount of time, but a long one runs every redraw
+  on the way, so test long spans by starting a walk in the past
+  (`start(Date.now() - 45*60000)`) and real firing with events a second or
+  two away. Don't use `setTime()` on the watch: the clock is the harness's.
 - There's no GPS in the emulator. `GPS_USERS` records who asked for GPS power
   (`GPS_USERS.bangturn == 1` while BangTurn has it on).
   Feed fixes with `Bangle.emit("GPS", {fix:1, lat:.., lon:.., hdop:1, time:new Date(..)})`,

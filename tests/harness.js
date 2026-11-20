@@ -7,14 +7,18 @@
    await h.reset();            // factory reset + install BangTurn + boot
    h.eval("1+1")              // -> 2 (JSON round trip from the watch)
    h.tx("code")               // run code, ignore the result
-   await h.wait(1500)          // let real time pass with the emulator running
+   await h.wait(1500)          // let 1.5 s pass on the watch's (virtual) clock
    await h.load()              // load() the default clock (reruns boot code)
+
+   The watch's clock is virtual (tests/emulator.js): it only moves in
+   h.wait(), which runs the watch's timers as they fall due, so waits take
+   no real time and every run sees the same times. Each test starts at
+   START (below) plus the time the boot takes.
 */
 const fs = require("fs");
 const path = require("path");
 const installer = require("../tools/install");
-
-const BANGLE_DIR = process.env.BANGLE_DIR || "/opt/bangle";
+const { load, BANGLE_DIR } = require("./emulator");
 const APPS = path.join(BANGLE_DIR, "BangleApps");
 const ROOT = path.join(__dirname, "..");
 
@@ -27,6 +31,14 @@ function check() {
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* When every test starts on the watch's clock: a fixed time, well away from
+   midnight and minute boundaries, so runs are repeatable. BANGTURN_TEST_TIME
+   (anything Date.parse takes, e.g. 2026-06-15T23:59:30Z) runs the suite at
+   another time, to try it near midnight say. */
+const START = process.env.BANGTURN_TEST_TIME ? Date.parse(process.env.BANGTURN_TEST_TIME)
+  : Date.UTC(2026, 5, 15, 10, 0, 0);
+if (isNaN(START)) throw new Error("BANGTURN_TEST_TIME: can't read " + process.env.BANGTURN_TEST_TIME);
 
 /* Files to install besides BangTurn itself: a test-only boot file and the
    latest sched lib from BangleApps (the firmware image bundles an older
@@ -49,12 +61,10 @@ function extraFiles() {
 async function create(opts) {
   opts = opts || {};
   check();
-  const emu = require(path.join(APPS, "core/lib/emulator.js"));
-  const h = { emu, log: [], errors: [] };
+  const h = { log: [], errors: [] };
   let rx = ""; // raw serial output from the watch
-  const init = () => emu.init({
-    EMULATOR: "banglejs2",
-    DEVICEID: "BANGLEJS2",
+  const emu = h.emu = await load({
+    start: START,
     rxCallback: c => { rx += String.fromCharCode(c); },
     consoleOutputCallback: line => {
       h.log.push(line);
@@ -84,7 +94,7 @@ async function create(opts) {
     }
   };
 
-  h.wait = async ms => { await sleep(ms); emu.idle(); };
+  h.wait = async ms => emu.advance(ms);
 
   /* load() an app (default: the clock) and wait until it is running */
   h.load = async file => {
@@ -98,20 +108,23 @@ async function create(opts) {
 
   const lines = extraFiles().map(installer.fileCmds).concat(installer.installCode(ROOT))
     .join("").split("\n").filter(l => l);
+  /* The first reset installs and boots, then snapshots the whole watch; the
+     rest restore that snapshot (milliseconds instead of seconds). */
+  let booted;
   h.reset = async () => {
-    // A fresh emulator per test: restoring flash under a running emulator
-    // leaves Storage's file cache stale and corrupts later writes.
-    emu.stopIdle();
-    await init();
+    rx = "";
     h.log.length = 0;
     h.errors.length = 0;
+    if (booted) return emu.restore(booted);
     // skip the first-boot welcome app
     h.tx(`require("Storage").writeJSON("welcome.json",{welcomed:true})`);
     for (const l of lines) h.tx(l);
     h.tx(`require("Storage").writeJSON("sched.json",[])`);
     // load() rebuilds .boot0 (the .js hash changed) and runs boot code, like a reboot
     await h.load();
-    h.errors.length = 0;
+    if (h.errors.length) throw new Error("uncaught error while booting: " + h.errors.join(" | "));
+    h.log.length = 0;
+    booted = emu.snapshot();
   };
 
   h.close = () => emu.stopIdle();
@@ -139,6 +152,7 @@ async function run() {
   const only = process.argv.find(a => a.startsWith("--grep="));
   const h = await create({ verbose });
   let failed = 0, ran = 0;
+  const t0 = Date.now();
   for (const t of tests) {
     if (only && !t.name.includes(only.slice(7))) continue;
     ran++;
@@ -154,7 +168,7 @@ async function run() {
     }
   }
   h.close();
-  console.log(`\n${ran - failed}/${ran} passed`);
+  console.log(`\n${ran - failed}/${ran} passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   process.exit(failed ? 1 : 0);
 }
 
