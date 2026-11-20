@@ -184,17 +184,17 @@ test("sched fires the 15 min countdown buzz in whatever app is open", async h =>
   assert.eq(buzzes(h).map(b => b[1]), [200], "one short buzz");
   assert.eq(h.eval("global.__FILE__"), file, "stayed in the clock");
   assert.eq(h.eval(`${BT}.getSched().map(a=>a.id)`).sort(),
-    ["bangturn.end", "bangturn.left1", "bangturn.left4", "bangturn.left8"]);
+    ["bangturn.back4", "bangturn.back8", "bangturn.end"]);
 });
 
-test("sched fires the 1 min countdown as 4 buzzes and the end silently", async h => {
+test("sched fires the 1/8 countdown (3.75 min left) as 3 buzzes and the end silently", async h => {
   await recordBuzz(h);
   const now = h.eval("Date.now()");
-  h.tx(`${BT}.start(${now - 59 * MIN + 1500})`);
+  h.tx(`${BT}.start(${now - 56.25 * MIN + 1500})`);
   await h.load();
   resetBuzz(h);
   await h.wait(4000);
-  assert.eq(buzzes(h).map(b => b[1]), [200, 200, 200, 200], "four short buzzes");
+  assert.eq(buzzes(h).map(b => b[1]), [200, 200, 200], "three short buzzes");
   // now the end, 1 s away: silent
   h.tx(`${BT}.cancel();${BT}.start(Date.now()-60*60000+1000)`);
   resetBuzz(h);

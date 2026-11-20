@@ -151,6 +151,10 @@ function drawIcon(k) {
       .fillRect(cx - 8, cy, cx - 5, cy).fillRect(cx + 5, cy, cx + 8, cy)
       .fillRect(cx, cy - 8, cx, cy - 5).fillRect(cx, cy + 5, cx, cy + 8);
   }
+  // back to the theme's colours: draw() goes on to draw the speed rows and
+  // the progress bar, which otherwise came out red, or in the background
+  // colour (invisible) after the phone's pin hole
+  g.reset();
 }
 /* GPS events already wake the watch (the speed tracker listens), so the
    symbol follows them: redraw it only when it changes. */

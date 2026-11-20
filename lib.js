@@ -23,22 +23,24 @@ var MIN_MINS = 1, MAX_MINS = 9 * 60 + 59; // the picker's hours wheel is 0-9
 var DURATION = DEF_MINS * MIN;
 var TURN = DURATION / 2;
 
-/* Countdown buzzes at these minutes left (n buzzes for the nth), only
-   those after the turnaround (a 20 minute walk skips the 15 min buzz). */
-var LEFT = [15, 8, 4, 1];
+/* Walk-back countdown buzzes, at halving fractions of the way back: half
+   of it left, a quarter, an eighth (on an hour walk 15, 7.5 and 3.75 min
+   left), with 1, 2 and 3 buzzes. They scale with the walk length, so every
+   walk gets all three, after the turnaround. [id, fraction of the way back
+   left, buzzes] */
+var BACK = [["back2", 1 / 2, 1], ["back4", 1 / 4, 2], ["back8", 1 / 8, 3]];
 
 /* The sched entries for a walk of `dur` ms, as [id, ms after the
-   (effective) start]. left15..left1 are the walk-back countdown buzzes. */
+   (effective) start]. back2..back8 are the walk-back countdown buzzes. */
 function events(dur) {
   var list = [["turn", dur / 2]];
-  LEFT.forEach(function (n) {
-    if (dur - n * MIN > dur / 2) list.push(["left" + n, dur - n * MIN]);
-  });
+  BACK.forEach(function (b) { list.push([b[0], dur - dur / 2 * b[1]]); });
   list.push(["end", dur]);
   return list;
 }
 var EVENTS = events(DURATION);
-var BUZZES = { left15: 1, left8: 2, left4: 3, left1: 4 };
+var BUZZES = {};
+BACK.forEach(function (b) { BUZZES[b[0]] = b[2]; });
 
 exports.events = events;
 exports.SETTINGS = SETTINGS;
@@ -287,7 +289,7 @@ exports.minusOne = function (now) {
    fired entry, then:
    - "turn": marks the walk turned, flags the alert and loads the app, which
      shows it via require("bangturn.alerts").turnaround(). Emits "turn".
-   - "left15".."left1": require("bangturn.alerts").countdown(n) in place,
+   - "back2".."back8": require("bangturn.alerts").countdown(n) in place,
      whatever app is open. Emits "buzz". Skipped if over a minute late.
    - "end": finish() (silent). Emits "end". So does any entry that fires
      after the walk's time is up. */

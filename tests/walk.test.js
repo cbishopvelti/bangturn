@@ -15,7 +15,7 @@ const DUR = 60 * MIN;
 const TURN = 30 * MIN;
 const BT = 'require("bangturn")';
 const SP = 'require("bangturn.speed")';
-const COUNTDOWN = ["left15", "left8", "left4", "left1"];
+const COUNTDOWN = ["back2", "back4", "back8"];
 
 /* Boot code that records, in every app: Bangle.buzz calls in BUZZ as
    [duration, strength] and "bangturn" events in EV. */
@@ -101,7 +101,7 @@ test("a whole walk: start, turnaround alarm, countdown buzzes, silent end", asyn
   assert.eq(widget(h), 0, "no widget when idle");
   assert(!gpsOn(h), "GPS off when idle");
 
-  // Start: one short buzz, six entries, GPS on, widget hidden in the app
+  // Start: one short buzz, five entries, GPS on, widget hidden in the app
   await startInApp(h);
   assert.eq(buzzes(h), [100], "start buzz");
   assert.eq(state(h).turned, false);
@@ -152,10 +152,10 @@ test("a whole walk: start, turnaround alarm, countdown buzzes, silent end", asyn
   await h.wait(200);
   assert.eq(screen(h).rows, ["Out 5.0 kph", "Back 4.0 kph"]);
 
-  // Countdown buzzes in whatever app is open: 1, 2, 3, 4
+  // Countdown buzzes in whatever app is open: 1, 2, 3 at 1/2, 1/4, 1/8 of the way back
   await h.load();
   const clock = file(h);
-  for (const [m, k] of [[45, 1], [52, 2], [56, 3], [59, 4]]) {
+  for (const [m, k] of [[45, 1], [52.5, 2], [56.25, 3]]) {
     clearLog(h);
     jump(h, m * MIN - 1500);
     await h.wait(2600 + k * 500);
@@ -257,7 +257,7 @@ test("cancel from the menu mid-walk stops everything", async h => {
   h.tx('Bangle.emit("touch",1,{x:88,y:100,type:0})');
   await h.wait(300);
   assert.eq(buzzes(h), [100]);
-  assert.eq(ids(h).length, 6);
+  assert.eq(ids(h).length, 5);
   assert.eq(speeds(h), { out: null, back: null }, "speeds start from zero");
 });
 
@@ -308,7 +308,7 @@ test("watch off past the end: the walk ends quietly at the next boot", async h =
   // a walk started 75 min ago, with the entries it was given then
   h.tx(`(function(){var bt=${BT},t=Date.now()-75*60000,s={start:t,offset:0,turned:false};` +
        `bt.write(s);bt.schedule(t,s)})()`);
-  assert.eq(ids(h).length, 6);
+  assert.eq(ids(h).length, 5);
   await h.load();
   await h.wait(2500);
   assert.eq(state(h), {}, "walk finished");
@@ -330,7 +330,7 @@ test("watch off across the turnaround: late alarm at boot, missed buzz skipped",
   await h.wait(800);
   const b = buzzes(h);
   assert(b.length && b.every(x => x == 600), "turnaround alarm only: " + JSON.stringify(b));
-  assert.eq(ids(h), ["left8", "left4", "left1", "end"], "missed entries dropped");
+  assert.eq(ids(h), ["back4", "back8", "end"], "missed entries dropped");
   h.tx("Bangle.setLocked(false);Bangle.emit('touch',1,{x:88,y:88,type:0})"); // tap to dismiss
   await h.wait(300);
   assert.eq(screen(h).rows.length, 2, "Out and Back rows");
@@ -341,11 +341,11 @@ test("a countdown buzz sched delivers late after a reboot is skipped", async h =
   // turned already; the 15 min buzz was due 3 min ago
   h.tx(`(function(){var bt=${BT},t=Date.now()-48*60000,s={start:t,offset:0,turned:true};` +
        `bt.write(s);bt.schedule(t+31*60000,s)})()`);
-  assert.eq(ids(h)[0], "left15");
+  assert.eq(ids(h)[0], "back2");
   await h.load();
   await h.wait(2500);
   assert.eq(buzzes(h), [], "no late buzz");
-  assert.eq(ids(h), ["left8", "left4", "left1", "end"]);
+  assert.eq(ids(h), ["back4", "back8", "end"]);
   assert(h.eval(`${BT}.isActive()`), "walk carries on");
 });
 
