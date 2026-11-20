@@ -48,7 +48,7 @@ function press(h) {
 
 test("idle screen: 60:00, time of day, press to start", async h => {
   await h.load("bangturn.app.js");
-  assert.eq(screenText(h), { time: "60:00", rows: ["Press to start"] });
+  assert.eq(screenText(h), { time: "60:00", rows: ["Press to start", "< Swipe: length"] });
   assert.eq(h.eval("screen"), "main");
   h.tx('Bangle.setLocked(false)');
   spyDraw(h);
@@ -261,7 +261,7 @@ test("-1 min past the end returns to the idle screen", async h => {
   h.tx("showWalkMenu()");
   h.tx('MENU["-1 min"]()');
   assert.eq(h.eval("screen"), "main");
-  assert.eq(screenText(h).rows, ["Press to start"]);
+  assert.eq(screenText(h).rows, ["Press to start", "< Swipe: length"]);
 });
 
 test("Cancel walk clears the walk and shows the idle screen", async h => {
@@ -273,7 +273,7 @@ test("Cancel walk clears the walk and shows the idle screen", async h => {
   assert.eq(h.eval("screen"), "main");
   assert.eq(h.eval(`${BT}.read()`), {});
   assert.eq(h.eval(`${BT}.getSched()`), []);
-  assert.eq(screenText(h), { time: "60:00", rows: ["Press to start"] });
+  assert.eq(screenText(h), { time: "60:00", rows: ["Press to start", "< Swipe: length"] });
 });
 
 test("menu returns to the countdown after 10 s without input", async h => {
@@ -301,7 +301,7 @@ test("walk ending while the menu is open returns to idle", async h => {
   h.tx("showWalkMenu()");
   h.tx(`${BT}.fire("end")`);
   assert.eq(h.eval("screen"), "main");
-  assert.eq(screenText(h).rows, ["Press to start"]);
+  assert.eq(screenText(h).rows, ["Press to start", "< Swipe: length"]);
 });
 
 test("turnaround alert then the countdown", async h => {
