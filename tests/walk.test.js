@@ -97,7 +97,7 @@ async function startInApp(h) {
 test("a whole walk: start, turnaround alarm, countdown buzzes, silent end", async h => {
   await record(h);
   await h.load("bangturn.app.js");
-  assert.eq(screen(h), { time: "60:00", rows: ["Tap to start", "Button: length"] }, "idle screen");
+  assert.eq(screen(h), { time: "60:00", rows: ["Tap to start"] }, "idle screen");
   assert.eq(widget(h), 0, "no widget when idle");
   assert(!gpsOn(h), "GPS off when idle");
 
@@ -248,7 +248,7 @@ test("cancel from the menu mid-walk stops everything", async h => {
   assert.eq(speeds(h), { out: null, back: null });
   assert(h.eval("EV").includes("cancel"));
   assert.eq(h.eval("screen"), "main");
-  assert.eq(screen(h), { time: "60:00", rows: ["Tap to start", "Button: length"] });
+  assert.eq(screen(h), { time: "60:00", rows: ["Tap to start"] });
   assert.eq(widget(h), 0, "widget hidden");
   clearLog(h);
   await h.wait(4500);
