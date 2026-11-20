@@ -37,6 +37,17 @@ BangTurn and Scheduler on it, rebuilt from main on every push by
 [`.github/workflows/pages.yml`](.github/workflows/pages.yml)
 (`sh tools/build-loader.sh` builds the same thing locally into `_site/`).
 
+**Trying a pull request before it's merged.** Every open PR from a branch in
+this repository gets its own install page at
+`cbishopvelti.github.io/bangturn/pr-<number>/` (for example
+[pr-33](https://cbishopvelti.github.io/bangturn/pr-33/)), with a yellow banner
+saying which PR it is. A bot comment on the PR links to it and is kept up to
+date. The preview's version is main's plus a fourth number (`0.01.32.3` is
+PR commits on top of main's `0.01.32`), so the App Loader offers it as an
+update, and main's next build after the merge as an update again. To go back
+without merging, open the main page and press reinstall on BangTurn. Previews
+rebuild on every push to the PR or to main and disappear when the PR closes.
+
 **App Loader from files.** Download this repository (Code, then Download ZIP)
 and unzip it. Open the [App Loader](https://banglejs.com/apps/) in Chrome or
 Edge and connect to the watch. On the **More...** tab, press **Install App from
