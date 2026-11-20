@@ -50,10 +50,11 @@ function kph(v) {
 
 /* The colour of the speed now and of its difference from the speed needed,
    from lines()'s c: green on the speed needed, shading to red as you fall
-   BAND kph behind it, and to the normal text colour (black on the light
-   theme) as you get BAND ahead. The screen has 8 colours, so the shades in
-   between are dithered by the firmware. */
-var BAND = 1;
+   BAND (a share of the speed needed: 20%) behind it, and to the normal
+   text colour (black on the light theme) as you get BAND ahead. The
+   screen has 8 colours, so the shades in between are dithered by the
+   firmware. */
+var BAND = 0.2;
 function nowColour(c) {
   if (c === undefined) return g.theme.fg;
   if (c <= 0) return g.toColor(-c, 1 + c, 0);
@@ -102,8 +103,8 @@ function hms(t, secs) {
      countdown) and d the difference, v less w, with its sign ("-0.3" is
      0.3 kph too slow; "--" when either is unknown). c is the same
      comparison for the colour of v and d (see nowColour): 0 on the speed needed, down
-     to -1 for BAND kph or more too slow, up to 1 for BAND or more faster
-     than needed; undefined when either is unknown. */
+     to -1 for BAND (20% of the speed needed) or more too slow, up to 1 for
+     BAND or more faster than needed; undefined when either is unknown. */
 function lines(st, now) {
   if (now === undefined) now = Date.now();
   var locked = Bangle.isLocked();
@@ -131,7 +132,9 @@ function lines(st, now) {
     var r = { a: "Now", v: kph(sp.now), w: kph(need), d: "--" };
     if (r.v != "--" && r.w != "--") {
       r.d = diff(sp.now, need);
-      r.c = E.clip((sp.now - need) / BAND, -1, 1);
+      // (never a band under 0.1 kph, the smallest step shown: next to the
+      // origin the speed needed is all but 0)
+      r.c = E.clip((sp.now - need) / Math.max(BAND * need, 0.1), -1, 1);
     }
     L.rows.push(r);
   }

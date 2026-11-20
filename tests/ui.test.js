@@ -306,10 +306,17 @@ test("the speed now and the difference are green on the speed needed, towards re
   // 20 min left (less the seconds the test takes): 1.5 km needs 4.5 kph
   const c = now => { h.tx(`global.SP={out:5,back:5,now:${now},home:1.5}`); return rawRows(h)[2].c; };
   assert.near(c(4.5), 0, 0.03, "on the speed needed");
-  assert.near(c(4.0), -0.5, 0.03, "half a kph slow: halfway to red");
-  assert.eq(c(3.4), -1, "a kph or more slow");
-  assert.near(c(4.75), 0.25, 0.03, "a little fast");
-  assert.eq(c(6), 1, "a kph or more fast");
+  assert.near(c(4.05), -0.5, 0.03, "10% slow: halfway to red");
+  assert.eq(c(3.5), -1, "20% or more slow (under 3.6)");
+  assert.near(c(4.725), 0.25, 0.03, "5% fast");
+  assert.eq(c(5.5), 1, "20% or more fast (over 5.4)");
+  // a share of the speed needed, not a fixed step: 1 kph out is nothing
+  // much at 10 kph needed, and far too slow at 2
+  const at = (need, now) => { h.tx(`global.SP={out:5,back:5,now:${now},home:${need / 3}}`); return rawRows(h)[2].c; };
+  assert.near(at(10, 9), -0.5, 0.03, "1 kph under 10");
+  assert.eq(at(2, 1), -1, "1 kph under 2");
+  assert.eq([at(0, 0), at(0, 4)], [0, 1], "at the origin: nothing needed, so standing still is on it");
+  assert.near(at(0.04, 0), -0.4, 0.03, "next to the origin the band is 0.1 kph, not a sliver");
   h.tx("global.SP={out:5,back:5,now:null,home:1.5}");
   assert.eq(rawRows(h)[2].c === undefined, true, "no speed now: no colour");
   h.tx("global.SP={out:5,back:5,now:5,home:null}");
