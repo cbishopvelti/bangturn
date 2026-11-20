@@ -53,8 +53,10 @@ function hms(t, secs) {
 }
 
 /* What the main screen shows, as plain data (also used by the tests).
-   now: time of day, with seconds only while unlocked (locked redraws once
-   a minute, so seconds would be stale). start: the walk's start time,
+   now: time of day, with seconds while unlocked. Locked, it's HH:MM and
+   dim holds the seconds (":37"), drawn grey after it: locked redraws only
+   once a minute, so they are the seconds of the last redraw (the lock, then
+   ":00" on each minute) and don't tick. start: the walk's start time,
    moved earlier by any -1 min taps, always with seconds (it's fixed, so
    they never go stale). */
 function lines(st, now) {
@@ -65,6 +67,7 @@ function lines(st, now) {
   var full = bt.fmt(st.remaining);
   var L = { full: full, time: st.active && locked ? "" + bt.mins(st.remaining) : full, rows: [] };
   L.now = hms(now, !locked);
+  L.dim = locked ? hms(now, true).substr(5) : "";
   L.nowFull = hms(now, true); // for layout, so HH:MM doesn't move when locked
   if (st.active) L.start = "Start " + hms(bt.startTime(), true);
   if (!st.active) L.rows.push("Tap to start", "Button: length");
@@ -86,16 +89,23 @@ function drawClock(L) {
     // starts just after it, so the time never moves
     var hw = R.w / 2 - 4;
     g.setFont("Vector", Math.min(fit(L.nowFull, 18, hw - ICON_W - 2), fit(L.start, 18, hw)));
-    g.setFontAlign(-1, 0).drawString(L.now, R.x + ICON_W + 4, y);
+    drawNow(L, R.x + ICON_W + 4, y);
     g.setFontAlign(1, 0).drawString(L.start, R.x2 - 3, y);
     drawIcon(gpsIcon());
   } else {
-    // sized and placed as the full HH:MM:SS, so HH:MM stays put when the
-    // seconds are left off while locked
+    // sized and placed as the full HH:MM:SS, so HH:MM stays put whether
+    // the seconds are black or grey
     fit(L.nowFull, 20, R.w - 4);
-    g.setFontAlign(-1, 0).drawString(L.now, R.x + (R.w - g.stringWidth(L.nowFull)) / 2, y);
+    drawNow(L, R.x + (R.w - g.stringWidth(L.nowFull)) / 2, y);
   }
   g.setFontAlign(0, 0);
+}
+/* The time of day from x, with the locked seconds in grey. The 3-bit
+   screen dithers grey; a half-and-half #888 loses the small walk-screen
+   digits, so it leans towards the text colour. */
+function drawNow(L, x, y) {
+  g.setFontAlign(-1, 0).drawString(L.now, x, y);
+  if (L.dim) g.setColor(g.theme.dark ? "#aaa" : "#555").drawString(L.dim, x + g.stringWidth(L.now), y).setColor(g.theme.fg);
 }
 
 /* The GPS symbol left of the time of day (top row) during a walk: where the

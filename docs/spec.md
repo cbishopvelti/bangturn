@@ -71,7 +71,7 @@ Tell you when to turn around on an out-and-back walk. Start it when you set off 
 
 - GPS is the main drain: on for the hour of the walk, roughly 10 to 20% of the battery per walk. No HRM or Bluetooth use.
 - GPS runs from a small boot/background handler so speed keeps being tracked when you leave the app.
-- Redraw the countdown once a second only while the screen is unlocked. When locked, redraw once a minute. Seconds would freeze then, so while locked the countdown drops its `:ss` (minutes stay where they are) and the time of day shows HH:MM.
+- Redraw the countdown once a second only while the screen is unlocked. When locked, redraw once a minute. Seconds would freeze then, so while locked the countdown drops its `:ss` (minutes stay where they are) and the time of day shows its seconds in grey (dithered), frozen at the last redraw (the lock, then `:00` each minute).
 - Nothing runs between ticks: the timer is a single `sched` wake-up, not a polling loop.
 
 ## Out of scope (v1)

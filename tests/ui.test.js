@@ -18,7 +18,7 @@ function fakeSpeed(h, get) {
    on its own below, since it changes as the test runs) */
 function screenText(h) {
   const L = h.eval(`lines(${BT}.status())`);
-  delete L.now; delete L.nowFull;
+  delete L.now; delete L.nowFull; delete L.dim;
   delete L.full;
   return L;
 }
@@ -61,13 +61,39 @@ test("idle screen: 60:00, time of day, tap to start", async h => {
   assert(!drawn.some(s => s.indexOf("Turn around") >= 0), "no turnaround line");
 });
 
-test("time of day has seconds while unlocked, not while locked", async h => {
+test("time of day has seconds while unlocked, grey seconds while locked", async h => {
   await h.load("bangturn.app.js");
   const t = h.eval("new Date(2026,10,19,9,5,7).getTime()");
   h.tx("Bangle.setLocked(false)");
   assert.eq(h.eval(`lines(${BT}.status(),${t}).now`), "09:05:07");
+  assert.eq(h.eval(`lines(${BT}.status(),${t}).dim`), "");
   h.tx("Bangle.setLocked(true)");
   assert.eq(h.eval(`lines(${BT}.status(),${t}).now`), "09:05");
+  assert.eq(h.eval(`lines(${BT}.status(),${t}).dim`), ":07");
+});
+
+test("locked: the time's seconds are drawn grey right after HH:MM, idle and walking", async h => {
+  await h.load("bangturn.app.js");
+  const spy = () => h.tx(`global.DRAWN=[];(function(o){g.drawString=function(s,x){DRAWN.push([""+s,x,g.getColor()]);return o.apply(g,arguments)}})(g.drawString)`);
+  for (const walking of [false, true]) {
+    if (walking) h.tx(`${BT}.start(Date.now()-${5 * MIN});Bangle.emit("bangturn","start")`);
+    h.tx('Bangle.setLocked(true)');
+    spy(h);
+    h.tx('Bangle.emit("lock",true)');
+    await h.wait(100);
+    const d = h.eval("DRAWN"), fg = h.eval("g.theme.fg");
+    const i = d.findIndex(e => /^:\d\d$/.test(e[0])) - 1; // HH:MM is just before
+    assert(i >= 0 && /^\d\d:\d\d$/.test(d[i][0]), "HH:MM then :SS: " + JSON.stringify(d));
+    assert(d[i][2] == fg && d[i + 1][2] != fg, "seconds in another colour: " + JSON.stringify(d));
+    assert(d[i + 1][1] > d[i][1], "seconds after HH:MM");
+    h.tx('Bangle.setLocked(false)');
+    spy(h);
+    h.tx('Bangle.emit("lock",false)');
+    await h.wait(100);
+    const u = h.eval("DRAWN");
+    assert(u.some(e => /^\d\d:\d\d:\d\d$/.test(e[0]) && e[2] == fg), "unlocked: HH:MM:SS in the text colour: " + JSON.stringify(u));
+    assert(!u.some(e => /^:\d\d$/.test(e[0])), "unlocked: no grey seconds");
+  }
 });
 
 test("time of day ticks on its own: seconds unlocked, minutes locked, also when idle", async h => {
