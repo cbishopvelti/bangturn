@@ -52,7 +52,8 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 - Walk done (countdown hits zero): **no buzz**.
 - Countdown buzzes also play in Quiet Mode.
 - Turnaround alarm: distinct and prominent. A continuous pattern of long full-strength buzzes (e.g. 600 ms on, 200 ms off), unlike any notification buzz, with the screen lit.
-- It stops when the watch unlocks (Bangle `lock` event fires with `false`, i.e. you looked at it or touched it) or after **6 seconds**, whichever comes first. No repeats.
+- It stops on a button press or a tap on the screen, or after **6 seconds**, whichever comes first. No repeats. (Not on unlock: on the real watch the buzz itself reads as a twist or tap and unlocks it. Twist and tap wake-ups stay on, as Chris wants them.)
+- Countdown buzzes must not unlock the watch: if a buzz unlocks a locked watch, it is locked again.
 - **Buzzes in Quiet Mode**, since this alarm is the whole point of the app.
 
 ## Background behaviour
@@ -86,7 +87,7 @@ Tell you when to turn around on an out-and-back walk. Press start when you set o
 ## Decisions
 
 - Fixed 1-hour walk, turnaround at 30 min, countdown shows the whole hour.
-- Prominent turnaround alarm; buzzes in Quiet Mode; stops on unlock or after 6 s.
+- Prominent turnaround alarm; buzzes in Quiet Mode; stops on a button press, a tap or after 6 s.
 - No warning buzz before the turnaround.
 - Home-stretch countdown buzzes at 15/8/4/1 min left (1/2/3/4 buzzes).
 - **−1 min** in the menu moves the walk's start time one minute earlier per tap (for when you forgot to press start straight away). The countdown drops by a minute and all `sched` timers are rescheduled. Any buzz whose time has already passed is skipped: if this moves the turnaround into the past, no alarm fires and the screen switches to the way back (Back speed row); if it moves the end into the past, the walk finishes.

@@ -134,7 +134,7 @@ else showMain();
 | Function | Called by | Must |
 |---|---|---|
 | `started()` | app, after `bt.start()` | One short buzz (~100 ms) |
-| `turnaround(done)` | app at startup (hook above) | Full-screen "TURN AROUND" (inverted), screen lit, 600 ms on / 200 ms off full-strength buzzes. Stops on unlock (`lock` event with `false`), a tap, a button press or after 6 s, then clears the screen, redraws widgets and calls `done()` once. Returns a function that stops it early. |
+| `turnaround(done)` | app at startup (hook above) | Full-screen "TURN AROUND" (inverted), screen lit, 600 ms on / 200 ms off full-strength buzzes. Stops on a tap, a button press or after 6 s (not on unlock, which the buzz itself can cause), then clears the screen, redraws widgets and calls `done()` once. Returns a function that stops it early. |
 | `countdown(n)` | core `fire()` | `n` short buzzes (200 ms on, 300 ms off). Runs inside any app: no drawing, no `load()` |
 
 All alerts buzz at full strength and in Quiet Mode: they call `Bangle.buzz`
@@ -142,10 +142,10 @@ directly and never read the `quiet` setting. While the turnaround alarm
 shows, it owns the UI (`Bangle.setUI` custom, plus a one-shot `BTN1`
 watch); the app sets its own UI again in `done()`.
 Buzzing can read as a twist or tap on the accelerometer, which unlocks a
-Bangle.js 2, so while any alert buzzes `wakeOnTwist`, `wakeOnDoubleTap` and
-`wakeOnFaceUp` are off (restored 500 ms after the last buzz, or by boot code
-on `load()`). A countdown also re-locks a watch that was locked if it
-unlocks mid-buzz anyway. Timings are in
+Bangle.js 2. The user's wake-up settings are left alone, so instead a
+countdown re-locks a watch that was locked if it unlocks while buzzing (or
+within 500 ms after), and the turnaround alarm doesn't stop on an unlock:
+only a button press, a tap or the 6 s timeout stop it. Timings are in
 `require("bangturn.alerts").T`.
 
 ## Speed: `bangturn.boot.js` and `require("bangturn.speed")`
