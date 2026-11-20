@@ -154,16 +154,61 @@ test("the trail survives leaving the app and a reboot", async h => {
 test("a long trail is thinned, and still leads home", async h => {
   const w = walker(h);
   start(h);
-  w.walk(5, 4680, { step: 5 }); // 6.5 km, a fix every 7 m
+  w.walk(5, 5760, { step: 5 }); // 8 km, a fix every 7 m
   const t = h.eval(`${SP}.trail()`);
   assert.eq(t.cd, 20, "points twice as far apart");
-  assert(t.n > 200 && t.n < 400, "points: " + t.n);
-  assert.near(home(h), 6500, 10);
+  assert(t.n > 256 && t.n < 512, "points: " + t.n);
+  assert.near(home(h), 8000, 10);
   w.walk(5, 1440, { step: 5, south: true });
-  assert.near(home(h), 4500, 10);
+  assert.near(home(h), 6000, 10);
   h.tx(`E.emit("kill")`);
-  const s = h.eval(`require("Storage").read("bangturn.gps.json")`);
-  assert(s && s.length > 1000 && s.length < 3000, "the saved file stays small: " + (s && s.length));
+  const len = f => h.eval(`(require("Storage").read("${f}")||"").length`);
+  assert(len("bangturn.gps.json") < 400, "the state's file stays small: " + len("bangturn.gps.json"));
+  assert.eq(len("bangturn.trail"), 4 * h.eval(`${SP}.trail().n`), "4 bytes a point");
+  await h.load();
+  assert.eq(h.eval(`${SP}.trail()`).cd, 20, "the spacing is kept");
+  assert.near(home(h), 6000, 10);
+});
+
+test("a gap in the fixes is bridged in a straight line that can be followed back", async h => {
+  const w = walker(h);
+  start(h);
+  go(w, 300);
+  w.move(0.4); // 400 m with no GPS
+  w.skip(288);
+  go(w, 300);
+  assert.near(home(h), 1000, 5);
+  go(w, 500, { south: true }); // back, to the middle of the gap
+  assert.near(home(h), 500, 5, "the trail has points along the gap");
+});
+
+test("the trail is saved with the first save, then every 5 minutes; after a crash it carries on in a straight line", async h => {
+  const w = walker(h);
+  const file = () => h.eval(`(require("Storage").read("bangturn.trail")||"").length`);
+  start(h);
+  go(w, 300); // 3 min 36 s
+  const first = file();
+  assert(first > 0 && first < 60, "saved once, a minute in: " + first);
+  go(w, 250); // 6 min 36 s
+  const n = file();
+  assert(n > 120, "saved again 5 min later: " + n);
+  go(w, 150); // 8 min 24 s
+  assert.eq(file(), n, "not again before 11 min");
+  h.tx(`E.removeAllListeners("kill")`); // a crash: no chance to save
+  await h.load();
+  // the trail as saved at 6 min (500 m), and the position saved at 8 min
+  assert.near(home(h), 5 * 480 / 3.6, 5, "back to the last saves");
+  go(w, 100);
+  assert.near(home(h), 800, 5, "the first fix joins the trail to where you are");
+  // the trail's file lost altogether: straight from the origin
+  h.tx(`${BT}.cancel()`);
+  start(h);
+  go(w, 150);
+  go(w, 150, { east: true });
+  h.tx(`E.removeAllListeners("kill");require("Storage").erase("bangturn.trail")`);
+  await h.load();
+  go(w, 50, { east: true });
+  assert.near(home(h), Math.sqrt(150 * 150 + 150 * 150) + 50, 5, "straight from the origin to the first fix, then on");
 });
 
 test("a new walk starts a new trail", async h => {

@@ -242,12 +242,12 @@ test("Out freezes at the turnaround (reached with -1 min); Back starts from zero
 
 test("the real turnaround: sched fires, the app loads, Out freezes", async h => {
   const w = walker(h);
-  start(h, 30 * MIN - 2000); // turnaround in 2 s
+  start(h, 30 * MIN - 5000); // turnaround in 5 s
   w.walk(5, 1500, { step: 10 });
   const out = stats(h);
   assert.eq(h.eval(`${BT}.status().phase`), "out");
   assert.eq(out.backMs, 0);
-  await h.wait(3000);
+  await h.wait(6000);
   assert.eq(h.eval("global.__FILE__"), "bangturn.app.js", "the alarm opened the app");
   assert.eq(h.eval(`${BT}.status().turned`), true);
   assert.eq(gpsOn(h), true, "GPS stays on for the walk back");

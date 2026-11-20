@@ -30,7 +30,8 @@ Data files:
 | File | Contents | Written by |
 |---|---|---|
 | `bangturn.json` | Walk state (below) | `lib.js` only |
-| `bangturn.gps.json` | `{start, outKm, outMs, backKm, backMs, ...}`: distance and GPS time for each half, plus where tracking had got to, and the trail home (`oa`, `oo`, `cd`, `tr`) | `speed.js` only |
+| `bangturn.gps.json` | `{start, outKm, outMs, backKm, backMs, ...}`: distance and GPS time for each half, plus where tracking had got to, and the trail home's origin and spacing (`oa`, `oo`, `cd`) | `speed.js` only |
+| `bangturn.trail` | The trail home's points: the bytes of an `Int16Array` of metres east and north of the origin, 4 bytes a point, 2 KB at most | `speed.js` only |
 | `sched.json` | Six entries with ids `bangturn.*` | `lib.js` only, through the `sched` module |
 
 ## Walk state: `bangturn.json`
@@ -203,22 +204,28 @@ How it tracks:
   (`fix.time`), so neither the wait for the first fix nor `-1 min` changes
   the average. A gap with no fixes is bridged in a straight line.
 - The speed now is the distance counted (the same 10 m steps, plus the step
-  in progress) between the good fixes of the last 20 s, kept in a short list
-  in RAM. It starts again after an app change.
+  in progress) between samples of the good fixes of the last 20 s (one every
+  2 s at most), kept in a short list in RAM. It starts again after an app change.
 - The trail home is a line of points about 10 m apart, from the origin (the
   first good fix) to where you are, kept as whole metres east and north of
-  the origin in an `Int16Array` (400 points; a longer trail is thinned to
-  every other point, and points are then twice as far apart). Every 5 m
-  moved, the trail is looked through for the earliest point within 25 m
-  that is at least 12 m shorter to go straight to than to follow the trail
-  to: the trail is cut back to it. That one rule drops loops and detours on
+  the origin in an `Int16Array` (room for 64 points to start with, doubling
+  to 512; a longer trail is thinned to every other point, and points are
+  then twice as far apart). A gap in the fixes is filled with points in a
+  straight line. Every 5 m moved, the trail is looked through for the
+  earliest point within 25 m that is at least 12 m shorter to go straight
+  to than to follow the trail to: the trail is cut back to it. (The search
+  checks every 4th point and only looks closely around the near ones:
+  Espruino re-reads a loop's text on every pass, so the inner loop is kept
+  tiny.) That one rule drops loops and detours on
   the way out, shortens the trail as it is retraced, and forgets a detour on
   the way back when it rejoins the trail. 12 m is more than any right-angle
   corner saves within 25 m, so corners stay. `get().home` is the trail's
   length plus the straight bit from its last point to the last good fix
   (or, just after turning back, the length to the nearest place on the
-  trail's last stretch). The trail is saved with the rest of the state, as
-  base64 in `tr`.
+  trail's last stretch). The trail has its own file, `bangturn.trail`,
+  written on `"kill"` and at most every 5 minutes (it is bigger than the
+  rest of the state). After a crash the trail carries on in a straight line
+  from where it was last saved.
 - Which half a fix belongs to follows the core's clock: `back` once
   `Date.now()` is `TURN` past the effective start. `-1 min` can move that,
   and the `"offset"` event tells the module.

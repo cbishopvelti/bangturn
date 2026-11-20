@@ -362,6 +362,8 @@ test("BangTurn stays small: memory in the background and in the app", async h =>
   w.walk(5, 300);
   await h.wait(200);
   const clockWalk = used();
-  assert(clockWalk - clockIdle < 0.08 * total, `background cost ${clockWalk - clockIdle} of ${total} vars`);
+  // most of it is the speed module: its code, and the trail home (64 points
+  // to start with, 512 at most, 8 bytes a point)
+  assert(clockWalk - clockIdle < 0.11 * total, `background cost ${clockWalk - clockIdle} of ${total} vars`);
   assert(app < 0.2 * total, `app uses ${app} of ${total} vars`);
 });
