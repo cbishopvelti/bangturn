@@ -63,6 +63,29 @@ exports.setMins = function (m) {
   return m;
 };
 
+/* Speed units: "kph" (the default) or "mph", saved in bangturn.settings.json
+   as { units }. Speeds are kept in kph everywhere; only what's shown is
+   converted (toUnits). Emits "settings" when changed. */
+var UNITS = ["kph", "mph"];
+var MPH = 1.609344; // km in a mile
+exports.UNITS = UNITS;
+exports.getUnits = function () {
+  var u = (require("Storage").readJSON(SETTINGS, 1) || {}).units;
+  return UNITS.indexOf(u) < 0 ? UNITS[0] : u;
+};
+exports.setUnits = function (u) {
+  if (UNITS.indexOf(u) < 0) u = UNITS[0];
+  var o = require("Storage").readJSON(SETTINGS, 1) || {};
+  o.units = u;
+  require("Storage").writeJSON(SETTINGS, o);
+  emit("settings");
+  return u;
+};
+/* A speed in kph, in units `u` (a non-number is passed through) */
+exports.toUnits = function (v, u) {
+  return u == "mph" && typeof v == "number" ? v / MPH : v;
+};
+
 /* Length in ms of the walk with state `s`, or of the next walk when idle.
    A walk saved before lengths were adjustable has no `dur`: an hour. */
 exports.duration = function (s) {

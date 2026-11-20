@@ -189,7 +189,7 @@ test("-1 min from the menu across the turnaround: no alarm, way back rows", asyn
   spyMenu(h);
   await press(h);
   assert.eq(h.eval("screen"), "menu", "button opens the menu");
-  assert.eq(menuItems(h).map(k => k.substr(0, 6)), ["Resume", "-1 min", "Cancel", "Info"]);
+  assert.eq(menuItems(h).map(k => k.substr(0, 6)), ["Resume", "-1 min", "Cancel", "Info", "Units:"]);
   pick(h, "-1 min");
   await h.wait(100);
   const st = h.eval(`${BT}.status()`);
@@ -219,7 +219,7 @@ test("button on the idle screen opens the menu, a second press goes back, no wal
   spyMenu(h);
   await press(h);
   assert.eq(h.eval("screen"), "menu", "button opens the idle menu");
-  assert.eq(menuItems(h), ["Length: 60 min", "Info"]);
+  assert.eq(menuItems(h), ["Length: 60 min", "Info", "Units: kph"]);
   await press(h);
   await h.wait(100);
   assert.eq(h.eval("screen"), "main", "button goes back to the idle screen");
