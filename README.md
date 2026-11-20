@@ -3,8 +3,9 @@
 A Bangle.js 2 app that tells you when to turn around on an out-and-back walk (an hour, or the length you set).
 
 Tap the screen to start (the button never starts a walk). At 30 minutes the watch buzzes hard and shows
-**TURN AROUND**. On the way back it buzzes 1, 2, 3 and 4 times at 15, 8, 4 and
-1 minutes left, and the walk ends quietly at an hour. The screen shows the
+**TURN AROUND**. On the way back it buzzes 1, 2 and 3 times when half, a
+quarter and an eighth of the way back is left (15, 7.5 and 3.75 minutes on
+an hour walk), and the walk ends quietly at an hour. The screen shows the
 countdown and your average speed out and back (GPS), and a widget shows the
 minutes left in other apps. Press the button during a walk for **Resume**,
 **-1 min** (if you started late) and **Cancel walk**.
@@ -62,9 +63,11 @@ already partway through.
 |---|---|---|
 | Turnaround alarm | `require("bangturn").start(Date.now()-29.5*60000)` | 30 s |
 | 15 min left (1 buzz) | `require("bangturn").start(Date.now()-44.5*60000)` | 30 s |
-| 8 min left (2 buzzes) | `require("bangturn").start(Date.now()-51.5*60000)` | 30 s |
-| 4 min left (3 buzzes) | `require("bangturn").start(Date.now()-55.5*60000)` | 30 s |
-| 1 min left (4 buzzes), then the end | `require("bangturn").start(Date.now()-58.5*60000)` | 30 s, end 60 s later |
+| 7.5 min left (2 buzzes) | `require("bangturn").start(Date.now()-52*60000)` | 30 s |
+| 3.75 min left (3 buzzes), then the end | `require("bangturn").start(Date.now()-55.75*60000)` | 30 s, end 3.75 min later |
+
+These times are for an hour walk. For another length, the buzzes come at
+1/2, 1/4 and 1/8 of the way back left.
 
 `require("bangturn").cancel()` stops a test walk. Disconnect the Web IDE
 before a check that needs the watch on your wrist.
