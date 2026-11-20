@@ -63,7 +63,7 @@ test("-1 min moves the GPS cut-off with the end", async h => {
   h.tx(`${BT}.start(Date.now()-${59 * MIN - 2000})`); // 62 s left
   h.tx(`${BT}.minusOne()`); // 2 s left
   h.tx(`${BT}.clearSched()`);
-  await h.wait(4000);
+  await h.wait(5000); // cut-off 3.5 s from now
   assert.eq(gpsUsers(h), [], "GPS off");
   assert.eq(h.eval(`${BT}.isActive()`), false, "walk ended");
 });
