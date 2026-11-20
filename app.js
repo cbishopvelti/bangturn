@@ -6,8 +6,9 @@
               around): it opens the idle menu (Length, the picker); a tap starts
    - running: small row with the time of day and the walk's start time,
               big m:ss countdown of the whole walk (just the minutes,
-              in the same place, while locked), average speed rows,
-              progress bar
+              in the same place, while locked), average speed rows, each
+              with the time to the origin at that speed, a row with the
+              speed now and the speed needed to be back at 0, progress bar
    Swipe right goes back to the clock. The minutes-left widget is hidden.
    - menu:    (idle: Length, Info; the button goes back)
               during a walk: Resume, -1 min (offset shown), Cancel walk,
@@ -37,12 +38,21 @@ function fit(txt, max, w) {
   return s;
 }
 
-/* "5.2 kph", or "-- kph" before there is a speed. Not toFixed(1):
+/* "5.2", or "--" before there is a speed ("99+" from 100 kph, which is
+   only ever the speed needed in the last seconds). Not toFixed(1):
    Espruino's doesn't carry, so 4.96 would show as 4.9. */
 function kph(v) {
-  if (typeof v != "number" || !isFinite(v)) return "-- kph";
+  if (typeof v != "number" || !isFinite(v) || v < 0) return "--";
   var n = Math.round(v * 10);
-  return Math.floor(n / 10) + "." + (n % 10) + " kph";
+  return n >= 1000 ? "99+" : Math.floor(n / 10) + "." + (n % 10);
+}
+
+/* Time to walk `km` at speed `v`, as m:ss like the countdown ("--" when
+   there is no distance or speed yet, the speed is 0, or it's over 999 min) */
+function tto(km, v) {
+  if (typeof km != "number" || typeof v != "number" || !(v > 0)) return "--";
+  var ms = km * 3600000 / v;
+  return ms < 60000000 ? bt.fmt(ms) : "--";
 }
 
 function pad(n) { return ("0" + n).substr(-2); }
@@ -56,7 +66,14 @@ function hms(t, secs) {
    now: time of day, with seconds only while unlocked (locked redraws once
    a minute, so seconds would be stale). start: the walk's start time,
    moved earlier by any -1 min taps, always with seconds (it's fixed, so
-   they never go stale). */
+   they never go stale).
+   rows: strings when idle. During a walk, objects (drawn in columns):
+   - {a:"Out"|"Back", v, tf, t}: the half's average speed v, and tf, the time
+     to the origin at that speed along the trail home (speed.get().home).
+     t is what is drawn of it: like the countdown, just the minutes while
+     locked.
+   - {a:"Now", v, b:"Need", w}: the speed over the last few seconds, and the
+     speed that covers the way home in the time left on the countdown. */
 function lines(st, now) {
   if (now === undefined) now = Date.now();
   var locked = Bangle.isLocked();
@@ -70,8 +87,14 @@ function lines(st, now) {
   if (!st.active) L.rows.push("Tap to start", "Button: length");
   else {
     var sp = speed.get() || {};
-    L.rows.push("Out " + kph(sp.out));
-    if (st.phase == "back") L.rows.push("Back " + kph(sp.back));
+    var row = function (a, v) {
+      var tf = tto(sp.home, v);
+      L.rows.push({ a: a, v: kph(v), tf: tf, t: locked ? tf.split(":")[0] : tf });
+    };
+    row("Out", sp.out);
+    if (st.phase == "back") row("Back", sp.back);
+    L.rows.push({ a: "Now", v: kph(sp.now), b: "Need",
+      w: kph(typeof sp.home == "number" && st.remaining > 0 ? sp.home * 3600000 / st.remaining : NaN) });
   }
   return L;
 }
@@ -138,6 +161,35 @@ function onGPSIcon(f) {
   if (k != drawnIcon) drawIcon(k);
 }
 
+/* The walk's rows, in columns so the numbers line up and don't move:
+     Out   5.2 kph   28:45     label, average speed, time to the origin
+     Back  4.9 kph   31:02     (only on the way back, always in this place)
+     Now   5.1   Need  4.6     always the bottom row
+   Labels and units are small, the numbers big. */
+function drawRows(rows) {
+  var R = Bangle.appRect, y0 = R.y + 77, x1 = R.x + 3, x2 = R.x2 - 3;
+  var NUM = 22, LBL = 15, SX = R.x + 79; // speeds end at SX
+  rows.forEach(function (r) {
+    var y = y0 + (r.b ? 2 : r.a == "Back" ? 1 : 0) * 22;
+    g.setFont("Vector", LBL).setFontAlign(-1, 0).drawString(r.a, x1, y + 1);
+    g.setFont("Vector", NUM).setFontAlign(1, 0).drawString(r.v, SX, y);
+    if (r.b) {
+      g.setFont("Vector", LBL).setFontAlign(-1, 0).drawString(r.b, SX + 10, y + 1);
+      // (smaller only for a speed of 10 kph or more)
+      fit(r.w, NUM, x2 - SX - 13 - g.stringWidth(r.b));
+      g.setFontAlign(1, 0).drawString(r.w, x2, y);
+    } else {
+      g.setFont("Vector", 12).setFontAlign(-1, 0).drawString("kph", SX + 2, y + 2);
+      // placed as the whole m:ss, so the minutes don't move while locked
+      // (smaller only for a time of 100 minutes or more)
+      var kx = SX + 6 + g.stringWidth("kph");
+      fit(r.tf, NUM, x2 - kx);
+      g.drawString(r.t, x2 - g.stringWidth(r.tf), y);
+    }
+  });
+  g.setFontAlign(0, 0);
+}
+
 /* Draws the main screen; returns the status it drew */
 function draw(st) {
   st = st || bt.status();
@@ -151,11 +203,14 @@ function draw(st) {
   g.setFontAlign(-1, 0).drawString(L.time, x - g.stringWidth(L.full) / 2, y + 48);
   g.setFontAlign(0, 0);
   drawClock(L);
-  L.rows.forEach(function (r, i) {
-    fit(r, 22, w);
-    g.drawString(r, x, y + 88 + i * 24);
-  });
-  if (!st.active) return st;
+  if (!st.active) {
+    L.rows.forEach(function (r, i) {
+      fit(r, 22, w);
+      g.drawString(r, x, y + 88 + i * 24);
+    });
+    return st;
+  }
+  drawRows(L.rows);
   // progress bar of the whole walk, with a notch at the turnaround
   var bx = R.x + 6, bw = R.w - 12, by = R.y2 - 16, bh = 12;
   g.drawRect(bx, by, bx + bw - 1, by + bh - 1);

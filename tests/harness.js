@@ -150,4 +150,12 @@ async function run() {
   process.exit(failed ? 1 : 0);
 }
 
-module.exports = { create, test, assert, run, sleep };
+/* The walk screen's speed rows (app.js lines().rows) as short text, for
+   tests that only care about the averages: "Out 5.2 kph", "Back -- kph".
+   Leaves out the times to the origin and the Now/Need row (ui.test.js
+   checks those); the idle screen's rows are text already. */
+function speedRows(rows) {
+  return rows.filter(r => !r.b).map(r => typeof r == "string" ? r : `${r.a} ${r.v} kph`);
+}
+
+module.exports = { create, test, assert, run, sleep, speedRows };

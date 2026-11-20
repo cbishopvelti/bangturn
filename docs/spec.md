@@ -28,7 +28,7 @@ Tell you when to turn around on an out-and-back walk. Start it when you set off 
 | State | Screen | Button | Touch |
 |---|---|---|---|
 | Idle | Time of day (HH:MM:SS) at the top, the walk length (`60:00`), "Tap to start", "Button: length" | Opens a menu: **Length** (the picker) and **Info** (as in the walk menu; Phone GPS reads "no walk" since nothing asks for GPS without one). The button never starts a walk on its own; in the menu it goes back to the idle screen, as does 10 s with no input | Tap: start. Swipe right: back to the clock. No left swipe (another app on the watch uses swipes) |
-| Running | At the top a small row with the time of day (HH:MM:SS) on the left and the walk's start time ("Start HH:MM:SS", moved earlier by any −1 min taps, always with seconds since it never changes) on the right; big countdown of the whole walk in minutes and seconds (`48:00`, no hours), with the seconds left off while the watch is locked (`48`, drawn in the same place and size so the minutes don't move); average speed row(s) in kph (see Speed), with a Back row once you've turned around; a GPS symbol left of the time of day in the top row, which always starts just after it so it doesn't move (a phone while the speeds come from the phone's GPS, a red crosshair while the watch's own GPS chip is on, blank before any GPS); progress bar with a notch at the turnaround | Short press: opens a menu with **Resume**, **−1 min** and **Cancel walk**. Long press: Bangle default (back to clock, walk keeps running) | Swipe right: back to the clock (walk keeps running) |
+| Running | At the top a small row with the time of day (HH:MM:SS) on the left and the walk's start time ("Start HH:MM:SS", moved earlier by any −1 min taps, always with seconds since it never changes) on the right; big countdown of the whole walk in minutes and seconds (`48:00`, no hours), with the seconds left off while the watch is locked (`48`, drawn in the same place and size so the minutes don't move); average speed row(s) in kph (see Speed), with a Back row once you've turned around, each with the time to the origin at that speed; a bottom row with the speed now and the speed needed (see Way home); a GPS symbol left of the time of day in the top row, which always starts just after it so it doesn't move (a phone while the speeds come from the phone's GPS, a red crosshair while the watch's own GPS chip is on, blank before any GPS); progress bar with a notch at the turnaround | Short press: opens a menu with **Resume**, **−1 min** and **Cancel walk**. Long press: Bangle default (back to clock, walk keeps running) | Swipe right: back to the clock (walk keeps running) |
 | Menu | List: Resume, −1 min (shows current offset, e.g. "−1 min (−3)"), Cancel walk, Info. Info opens a list: **GPS via** (phone, watch or none yet: where the last GPS fix came from), **Watch GPS** (ON/off: whether the watch's own GPS chip is powered), **Phone GPS** (working, setting off, no Bluetooth or no fixes: the first missing link for the phone's GPS), **GPS apps** (the apps that have asked for GPS power, from the firmware's `Bangle._PWR.GPS` list), **Last fix** (how long ago GPS last gave a position) and **Battery** (%); tap a row to refresh, back returns to the menu | Selects | Tap an item. Resume (or no input for 10 s) goes back to the countdown. −1 min moves the start time 1 minute earlier per tap and stays in the menu. Cancel walk clears all BangTurn `sched` timers and returns to idle |
 | Alert | "TURN AROUND", full-screen high contrast | Stops alarm | Tap: stops alarm |
 
@@ -43,6 +43,21 @@ Tell you when to turn around on an out-and-back walk. Start it when you set off 
 - Average = distance covered / time elapsed in that half. Distance is the sum of GPS fix-to-fix distances, ignoring fixes with poor accuracy (HDOP too high) and jumps that imply more than ~15 kph.
 - Before the first fix the row shows `-- kph`. If you use −1 min, the speed still uses only the time GPS has been running, since there's no distance for the minutes before you pressed start.
 - GPS turns on when the walk starts and off when it ends or is cancelled.
+
+## Way home
+
+The origin is where the walk started (the first good GPS fix). The watch keeps the **trail** back to it: the path you have walked, by its shortest way.
+
+- Loops and there-and-back detours on the way out are cut out: when you come back within about 25 m of an earlier part of the trail, the trail is cut back to there.
+- On the way back you follow the trail, and it shortens as you go, whenever you actually turn around (early, late or on the alarm).
+- If you leave the trail on the way back (a detour to use up time), the detour is added: the way home is back the way you came. When you rejoin the trail anywhere, the detour is forgotten and the way home is the trail from there.
+- The **distance home** is the length of the trail. Right-angle corners are kept; a hairpin whose two legs are within 25 m is treated as a detour and cut.
+
+On the walk screen:
+
+- Next to each average speed, the **time to the origin** at that speed: distance home / speed, as `m:ss` (just the minutes while locked, like the countdown). `Out 5.2 kph 28:45` means retracing the trail at your Out average takes 28:45. Compare it with the countdown: less than the countdown means you'd be early.
+- A bottom row, `Now 5.1  Need 4.6`: **Now** is your speed over the last 20 s. **Need** is distance home / time left on the countdown: the speed that brings you to the origin as the countdown reaches 0. On the way out that is for turning around right now, so it starts low and climbs to about your Out speed by the turnaround.
+- `--` where there's nothing to show: no GPS yet, no Back speed yet, a speed of 0 (you'd never arrive), or no good fix in the last 15 s for Now. A needed speed of 100 kph or more shows `99+`.
 
 ## Alerts
 

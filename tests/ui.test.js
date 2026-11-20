@@ -1,7 +1,7 @@
 /* UI tests: idle, running and menu screens in app.js.
    Run: npm test  (or: node tests/run.js tests/ui.test.js -v --grep=name)
    The emulator clock can't advance, so walks start in the past. */
-const { test, assert } = require("./harness");
+const { test, assert, speedRows } = require("./harness");
 
 const MIN = 60000;
 const BT = 'require("bangturn")';
@@ -20,8 +20,11 @@ function screenText(h) {
   const L = h.eval(`lines(${BT}.status())`);
   delete L.now; delete L.nowFull;
   delete L.full;
+  L.rows = speedRows(L.rows); // "Out 5.2 kph": the whole rows are in rawRows()
   return L;
 }
+/* The rows as lines() gives them: with the times to the origin and Now/Need */
+const rawRows = h => h.eval(`lines(${BT}.status()).rows`);
 /* "HH:MM:SS" of a watch timestamp, as the watch formats it */
 function hms(h, t) {
   return h.eval(`(function(d){function p(n){return ("0"+n).substr(-2)}return p(d.getHours())+":"+p(d.getMinutes())+":"+p(d.getSeconds())})(new Date(${t}))`);
@@ -159,7 +162,92 @@ test("running back: Out and Back speed rows", async h => {
   spyDraw(h);
   h.tx('Bangle.emit("bangturn","offset")');
   const drawn = h.eval("DRAWN");
-  assert(drawn.includes("Back -- kph"), JSON.stringify(drawn));
+  assert(drawn.includes("Back") && drawn.includes("--"), JSON.stringify(drawn));
+});
+
+test("time to the origin beside each speed, and the Now and Need row", async h => {
+  fakeSpeed(h);
+  const now = h.eval("Date.now()");
+  h.tx(`${BT}.start(${now - 12 * MIN})`);
+  await h.load("bangturn.app.js");
+  h.tx("Bangle.setLocked(false)");
+  // 1 km from the origin by the trail, 48 min left: 1.25 kph gets you there at 0
+  h.tx("global.SP={out:5,back:null,now:5.64,home:1}");
+  assert.eq(rawRows(h), [
+    { a: "Out", v: "5.0", tf: "12:00", t: "12:00" },
+    { a: "Now", v: "5.6", b: "Need", w: "1.3" }], "walking out: no Back row");
+  h.tx(`for(var i=0;i<24;i++)${BT}.minusOne()`); // 36 min in: 24 min left
+  h.tx("global.SP={out:5.2,back:4.8,now:4.96,home:2}");
+  const r = rawRows(h);
+  assert.eq(r[0], { a: "Out", v: "5.2", tf: "23:05", t: "23:05" }, "2 km at 5.2 kph");
+  assert.eq(r[1], { a: "Back", v: "4.8", tf: "25:00", t: "25:00" }, "2 km at 4.8 kph");
+  assert.eq([r[2].a, r[2].v, r[2].b], ["Now", "5.0", "Need"]);
+  assert(r[2].w == "5.0" || r[2].w == "5.1", "2 km in just under 24 min: " + r[2].w);
+  assert.eq(r.length, 3);
+});
+
+test("nothing to show yet is --, never a made-up number", async h => {
+  fakeSpeed(h);
+  h.tx(`${BT}.start(${h.eval("Date.now()") - 40 * MIN})`);
+  await h.load("bangturn.app.js");
+  h.tx("Bangle.setLocked(false)");
+  const none = { a: "Now", v: "--", b: "Need", w: "--" };
+  assert.eq(rawRows(h), [{ a: "Out", v: "--", tf: "--", t: "--" }, { a: "Back", v: "--", tf: "--", t: "--" }, none],
+    "no GPS yet");
+  h.tx("global.SP={out:5,back:null,now:null,home:1.5}");
+  assert.eq(rawRows(h)[1], { a: "Back", v: "--", tf: "--", t: "--" }, "no Back speed yet");
+  assert.eq(rawRows(h)[0].tf, "18:00");
+  assert.eq(rawRows(h)[2].v, "--", "no speed now");
+  assert(rawRows(h)[2].w != "--", "the speed needed only takes the way home and the countdown");
+  h.tx("global.SP={out:5,back:0,now:0,home:1.5}");
+  assert.eq(rawRows(h)[1], { a: "Back", v: "0.0", tf: "--", t: "--" }, "standing still since the turnaround: never");
+  assert.eq(rawRows(h)[2].v, "0.0");
+  h.tx("global.SP={out:5,back:4,now:4,home:0}");
+  assert.eq(rawRows(h)[1].tf, "0:00", "at the origin");
+  assert.eq(rawRows(h)[2].w, "0.0");
+  h.tx("global.SP={out:5,back:0.01,now:4,home:3}");
+  assert.eq(rawRows(h)[1].tf, "--", "over 999 minutes");
+  h.tx(`for(var i=0;i<19;i++)${BT}.minusOne()`); // under a minute left, 3 km to go
+  assert.eq(rawRows(h)[2].w, "99+", "more than 100 kph needed");
+  assert.eq(h.eval("kph(99.94)"), "99.9");
+  assert.eq(h.eval("kph(99.96)"), "99+");
+  assert.eq(h.eval("kph(4.96)"), "5.0"); // toFixed(1) gives 4.9 here
+});
+
+test("locked: times to the origin drop their seconds and stay in place; rows don't move", async h => {
+  fakeSpeed(h);
+  h.tx(`${BT}.start(${h.eval("Date.now()") - 40 * MIN})`);
+  await h.load("bangturn.app.js");
+  h.tx("global.SP={out:5.2,back:4.8,now:5.1,home:1.4}");
+  // record [string, x, y, font, x alignment is left] for each drawString
+  h.tx(`global.AT=[];(function(o){g.drawString=function(s,x,y){AT.push([""+s,Math.round(x),Math.round(y),g.getFont()]);return o.apply(g,arguments)}})(g.drawString)`);
+  h.tx('Bangle.setLocked(false);Bangle.emit("lock",false)');
+  const open = h.eval("AT");
+  const at = (list, s) => list.find(a => a[0] == s) || assert(false, `drew "${s}": ${JSON.stringify(list)}`);
+  assert.eq(rawRows(h)[0].t, "16:10");
+  assert.eq(rawRows(h)[1].t, "17:30");
+  h.tx('AT=[];Bangle.setLocked(true);Bangle.emit("lock",true)');
+  const shut = h.eval("AT");
+  assert.eq(rawRows(h).map(r => r.t || ""), ["16", "17", ""], "just the minutes");
+  assert.eq(rawRows(h)[0].tf, "16:10", "still placed as the whole m:ss");
+  assert.eq(at(shut, "16").slice(1), at(open, "16:10").slice(1), "same place and font as in m:ss");
+  assert.eq(at(shut, "17").slice(1), at(open, "17:30").slice(1));
+  // columns: labels share an x, speeds end at the same x, rows are evenly spaced
+  for (const l of [open, shut]) {
+    const y = ["Out", "Back", "Now"].map(s => at(l, s));
+    assert.eq([y[1][1], y[2][1]], [y[0][1], y[0][1]], "labels line up");
+    assert.eq(y[2][2] - y[1][2], y[1][2] - y[0][2], "evenly spaced");
+    assert.eq([at(l, "4.8")[1], at(l, "5.1")[1]], [at(l, "5.2")[1], at(l, "5.2")[1]], "speeds line up");
+    assert(y[2][2] + 9 < h.eval("Bangle.appRect.y2") - 19, "clear of the progress bar");
+    assert(y[0][2] - 9 > h.eval("Bangle.appRect.y") + 66, "clear of the countdown");
+  }
+  // on the way out the Now row is already in the bottom place
+  h.tx(`${BT}.start(Date.now()-5*${MIN})`);
+  h.tx('AT=[];Bangle.emit("lock",true)');
+  const out = h.eval("AT");
+  assert.eq(at(out, "Now").slice(1), at(shut, "Now").slice(1), "Now doesn't move at the turnaround");
+  assert.eq(at(out, "Out").slice(1), at(shut, "Out").slice(1));
+  assert(!out.some(a => a[0] == "Back"), "no Back row yet");
 });
 
 test("speed hook returning nothing still draws", async h => {

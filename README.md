@@ -5,7 +5,11 @@ A Bangle.js 2 app that tells you when to turn around on an out-and-back walk (an
 Tap the screen to start (the button never starts a walk). At 30 minutes the watch buzzes hard and shows
 **TURN AROUND**. On the way back it buzzes 1, 2, 3 and 4 times at 15, 8, 4 and
 1 minutes left, and the walk ends quietly at an hour. The screen shows the
-countdown and your average speed out and back (GPS), and a widget shows the
+countdown and your average speed out and back (GPS), each with the time it
+would take to get back to the start at that speed, and a bottom row with
+your speed now and the speed you need to be back as the countdown reaches 0.
+The way back is measured along the path you walked, with loops and detours
+cut out (see "Way home" in the spec). A widget shows the
 minutes left in other apps. Press the button during a walk for **Resume**,
 **-1 min** (if you started late) and **Cancel walk**.
 
@@ -112,6 +116,18 @@ before a check that needs the watch on your wrist.
     readings that look too high or too low, and whether standing still
     creeps up the distance. Note the battery before and after: the spec
     expects 10 to 20% for the hour.
+11. **Way home.** On the same walk, watch the times next to the speeds and
+    the bottom row. Walking steadily, Now should sit near your average and
+    not jump about by more than a few tenths (it is the last 20 s). Walk a
+    small loop or a there-and-back detour on the way out: the times should
+    drop back when you rejoin your path. Turn around: the times should fall
+    about a second a second, and Need should hold steady if you keep to it.
+    Step off the path on the way back and rejoin it further on: the times
+    rise, then drop back. At the start point they should read close to
+    `0:00` (within GPS accuracy, 10 to 20 m). Note if the times ever grow
+    while you are walking back along the same path: that means the watch
+    isn't matching the way back to the way out (the 25 m in `speed.js`,
+    `SNAP`, would need to be larger).
 
 If you use the Alarms app: BangTurn's entries are hidden there, but its
 Advanced menu's Disable All and Delete All also switch off or remove the

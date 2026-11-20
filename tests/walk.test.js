@@ -7,7 +7,7 @@
    entries and tells everything listening (the "offset" event, as -1 min
    does). sched then fires the next event in real time, a second or two
    later. The GPS clock is the walker's own (tests/walker.js). */
-const { test, assert } = require("./harness");
+const { test, assert, speedRows } = require("./harness");
 const walker = require("./walker");
 
 const MIN = 60000;
@@ -42,10 +42,11 @@ const screen = h => {
   delete L.now; delete L.nowFull;
   delete L.start;
   delete L.full;
+  L.rows = speedRows(L.rows);
   return L;
 };
 const widget = h => h.eval("WIDGETS.bangturn.width");
-const speeds = h => h.eval(`${SP}.get()`);
+const speeds = h => h.eval(`(function(v){return {out:v.out,back:v.back}})(${SP}.get())`);
 /* the inverted TURN AROUND screen is showing */
 const alarmShowing = h =>
   h.eval("g.getPixel(4,4)==g.toColor(g.theme.fg) && g.getPixel(4,4)!=g.toColor(g.theme.bg)");
