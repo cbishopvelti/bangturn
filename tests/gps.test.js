@@ -382,7 +382,11 @@ test("GPS never stays on once the walk's time is up", async h => {
   assert.eq(gpsOn(h), true);
   const before = stats(h);
   w.fix();
-  await h.wait(1000);
+  // wait for the end by the watch's clock (not a fixed time: the emulator's
+  // speed varies), then send fixes well before the 1.5 s cut-off timer
+  for (let i = 0; i < 60 && h.eval(`${BT}.status().remaining`) > 0; i++) await h.wait(50);
+  assert.eq(h.eval(`${BT}.status().remaining`), 0, "the walk's time is up");
+  await h.wait(100);
   w.walk(5, 5); // a fix after the end, before the cut-off timer
   assert.eq(gpsOn(h), false, "GPS off at the next GPS event");
   assert.eq(stats(h).tracking, false);
