@@ -231,3 +231,72 @@ test("sched turnaround opens the app with the alarm, then the countdown", async 
   assert.eq(buzzes(h).length, n, "alarm stopped");
   assert.eq(h.eval(`${BT}.status().phase`), "back");
 });
+
+/* Buzzing can read as a twist or tap on a real watch and unlock it. The
+   emulator has no accelerometer, so check the wake-ups are off while we buzz
+   and come back after, and that a countdown re-locks a watch that unlocks. */
+const WAKES = `(function(){var o=Bangle.getOptions();return [o.wakeOnTwist,o.wakeOnDoubleTap,o.wakeOnFaceUp]})()`;
+const wakesOn = h => h.tx(`Bangle.setOptions({wakeOnTwist:true,wakeOnDoubleTap:true,wakeOnFaceUp:true})`);
+
+test("countdown turns twist/tap wake-ups off while buzzing, then restores them", async h => {
+  await recordBuzz(h);
+  wakesOn(h);
+  h.tx(`Bangle.setOptions({wakeOnFaceUp:false})`); // a mix, to check each is restored as it was
+  h.tx(`${AL}.countdown(3)`);
+  await h.wait(300);
+  assert.eq(h.eval(WAKES), [false, false, false], "off while buzzing");
+  await h.wait(1500 + 600);
+  assert.eq(h.eval(WAKES), [true, true, false], "restored after");
+  assert.eq(buzzes(h).length, 3);
+});
+
+test("countdown keeps a locked watch locked and dark", async h => {
+  await recordBuzz(h);
+  h.tx(`Bangle.setLocked(true);Bangle.setLCDPower(0)`);
+  await h.wait(100);
+  h.tx(`${AL}.countdown(2)`);
+  await h.wait(200);
+  h.tx(`Bangle.setLocked(false);Bangle.emit("lock",false)`); // as a buzz-triggered twist would
+  await h.wait(100);
+  assert.eq(h.eval("Bangle.isLocked()"), true, "locked again");
+  await h.wait(1500);
+  assert.eq(h.eval("Bangle.isLocked()"), true, "still locked after the buzzes");
+  // and once the countdown is over, unlocking works normally
+  h.tx(`Bangle.setLocked(false);Bangle.emit("lock",false)`);
+  await h.wait(100);
+  assert.eq(h.eval("Bangle.isLocked()"), false, "real unlock later is left alone");
+});
+
+test("countdown leaves an unlocked watch unlocked", async h => {
+  await recordBuzz(h);
+  h.tx(`Bangle.setLocked(false)`);
+  h.tx(`${AL}.countdown(1)`);
+  await h.wait(1200);
+  assert.eq(h.eval("Bangle.isLocked()"), false);
+});
+
+test("turnaround turns twist/tap wake-ups off, restores them when it stops", async h => {
+  await recordBuzz(h);
+  wakesOn(h);
+  h.tx(`global.DONE=0;${AL}.turnaround(function(){DONE++})`);
+  await h.wait(1500);
+  assert.eq(h.eval(WAKES), [false, false, false], "off during the alarm");
+  assert.eq(h.eval("DONE"), 0, "still running");
+  h.tx(`Bangle.emit("lock",false)`);
+  await h.wait(800);
+  assert.eq(h.eval("DONE"), 1);
+  assert.eq(h.eval(WAKES), [true, true, true], "restored");
+});
+
+test("overlapping countdown and turnaround restore wake-ups once both end", async h => {
+  await recordBuzz(h);
+  wakesOn(h);
+  h.tx(`global.STOP=${AL}.turnaround(function(){})`);
+  h.tx(`${AL}.countdown(4)`);
+  await h.wait(500);
+  h.tx(`STOP()`);
+  await h.wait(800);
+  assert.eq(h.eval(WAKES), [false, false, false], "still off: countdown buzzing");
+  await h.wait(2000);
+  assert.eq(h.eval(WAKES), [true, true, true], "restored after both");
+});
