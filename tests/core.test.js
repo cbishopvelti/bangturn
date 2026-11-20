@@ -31,6 +31,22 @@ function listen(h) {
 function nextSched(h) {
   return h.eval(`(function(){var t=global["\\xff"].timers[Bangle.SCHED];return t&&{delay:t.time/1000,js:t.cb}})()`);
 }
+/* sched only arms entries dated today, so when an entry is tomorrow (tests
+   running late in the day) the next wake-up is sched's midnight re-check.
+   Check whichever is right for entry `id` due at `at`, so tests pass at any
+   time of day. */
+function expectNext(h, id, at, msg) {
+  const n = nextSched(h), t = h.eval("Date.now()");
+  const tz = -h.eval("new Date().getTimezoneOffset()") * 60000; // local - UTC
+  const day = x => Math.floor((x + tz) / 86400000);
+  if (day(at) == day(t)) {
+    assert.eq(n.js, `require("bangturn").fire("${id}")`, msg);
+    assert.near(n.delay, at - t, 1500, msg);
+  } else {
+    assert.eq(n.js, 'eval(require("Storage").read("sched.boot.js"))', msg + " (midnight re-check)");
+    assert.near(n.delay, (day(t) + 1) * 86400000 - tz - t, 1500, msg + " (midnight re-check)");
+  }
+}
 function gpsOn(h) {
   return h.eval(`!!(global.GPS_USERS && GPS_USERS.bangturn)`); // see harness
 }
@@ -59,9 +75,7 @@ test("start writes state and six sched entries", async h => {
   const st = h.eval(`${BT}.status(${now + 10 * MIN})`);
   assert.eq([st.active, st.phase, st.remaining, st.toTurn], [true, "out", 50 * MIN, 20 * MIN]);
   // sched is armed for the turnaround
-  const n = nextSched(h);
-  assert.eq(n.js, 'require("bangturn").fire("turn")');
-  assert.near(n.delay, TURN - (h.eval("Date.now()") - now), 1500, "turnaround delay");
+  expectNext(h, "turn", now + TURN, "turnaround delay");
 });
 
 test("start keeps other apps' alarms", async h => {
@@ -89,14 +103,38 @@ test("entries crossing midnight get tomorrow's date", async h => {
   assert.eq(new Set(dates).size, 2, "two dates");
 });
 
+test("a turnaround missed across midnight while the watch was off still shows", async h => {
+  // The walk started 46 min ago; the watch was off for the turnaround and
+  // the 15 min buzz, and they are dated yesterday (midnight passed while it
+  // was off), which sched alone would never fire.
+  const now = h.eval("Date.now()");
+  const start = now - 46 * MIN;
+  h.tx(`(function(){var bt=${BT},s={start:${start},offset:0,turned:false};bt.write(s);bt.schedule(${start},s);` +
+       `var y=new Date(${now}-86400000).toLocalISOString().substr(0,10);` +
+       `var al=require("sched").getAlarms().map(function(a){if(a.id=="bangturn.turn"||a.id=="bangturn.left15")a.date=y;return a});` +
+       `require("sched").setAlarms(al)})()`);
+  await h.load(); // boot
+  let file;
+  for (let i = 0; i < 40 && (file = h.eval("global.__FILE__")) != "bangturn.app.js"; i++) await h.wait(100);
+  assert.eq(file, "bangturn.app.js", "late turnaround opened the app");
+  assert.eq(h.eval(`${BT}.read().turned`), true);
+  expectEntries(h, start, ["left8", "left4", "left1", "end"]);
+});
+
+test("catch-up leaves entries dated today or later alone", async h => {
+  const now = h.eval("Date.now()");
+  h.tx(`${BT}.start(${now})`);
+  const before = h.eval(`${BT}.getSched()`);
+  h.tx(`${BT}.catchUp()`);
+  assert.eq(h.eval(`${BT}.getSched()`), before);
+});
+
 test("entries use local time in other time zones", async h => {
   h.tx("E.setTimeZone(5.5)");
   const now = h.eval("Date.now()");
   h.tx(`${BT}.start(${now})`);
   expectEntries(h, now, ALL);
-  const n = nextSched(h);
-  assert.eq(n.js, 'require("bangturn").fire("turn")');
-  assert.near(n.delay, TURN - (h.eval("Date.now()") - now), 1500, "turnaround delay");
+  expectNext(h, "turn", now + TURN, "turnaround delay");
 });
 
 test("-1 min moves the start and every entry a minute earlier", async h => {
@@ -226,9 +264,7 @@ test("reboot restores the walk: state, sched wake-up and GPS", async h => {
   const s = h.eval(`${BT}.read()`);
   assert.eq([s.start, s.offset], [now - 10 * MIN, 1]);
   expectEntries(h, now - 11 * MIN, ALL);
-  const n = nextSched(h);
-  assert.eq(n.js, 'require("bangturn").fire("turn")');
-  assert.near(n.delay, 19 * MIN - (h.eval("Date.now()") - now), 1500, "turnaround delay after reboot");
+  expectNext(h, "turn", now + 19 * MIN, "turnaround delay after reboot");
   assert(gpsOn(h), "GPS back on after reboot");
 });
 
@@ -244,7 +280,7 @@ test("sched fires the turnaround: app loads and shows the alert", async h => {
   const s = h.eval(`${BT}.read()`);
   assert.eq([s.turned, s.alert], [true, undefined], "turned, alert taken by the app");
   expectEntries(h, now - TURN + 1500, ["left15", "left8", "left4", "left1", "end"]);
-  assert.eq(nextSched(h).js, 'require("bangturn").fire("left15")');
+  expectNext(h, "left15", now - TURN + 1500 + 45 * MIN, "next is the 15 min buzz");
 });
 
 test("sched fires a countdown buzz without leaving the current app", async h => {
@@ -255,7 +291,7 @@ test("sched fires a countdown buzz without leaving the current app", async h => 
   await h.wait(3500);
   assert.eq(h.eval("BUZZ"), [200], "one buzz at 15 min left");
   assert(h.eval(`global.__FILE__!="bangturn.app.js"`), "still on the clock");
-  assert.eq(nextSched(h).js, 'require("bangturn").fire("left8")');
+  expectNext(h, "left8", now - 45 * MIN + 1500 + 52 * MIN, "next is the 8 min buzz");
 });
 
 test("sched fires the end: walk finishes and GPS turns off", async h => {
