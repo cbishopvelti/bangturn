@@ -18,7 +18,7 @@ function fakeSpeed(h, get) {
    on its own below, since it changes as the test runs) */
 function screenText(h) {
   const L = h.eval(`lines(${BT}.status())`);
-  delete L.now;
+  delete L.now; delete L.nowFull;
   delete L.full;
   return L;
 }

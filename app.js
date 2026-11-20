@@ -65,6 +65,7 @@ function lines(st, now) {
   var full = bt.fmt(st.remaining);
   var L = { full: full, time: st.active && locked ? "" + bt.mins(st.remaining) : full, rows: [] };
   L.now = hms(now, !locked);
+  L.nowFull = hms(now, true); // for layout, so HH:MM doesn't move when locked
   if (st.active) L.start = "Start " + hms(bt.startTime(), true);
   if (!st.active) L.rows.push("Tap to start", "Button: length");
   else {
@@ -84,13 +85,15 @@ function drawClock(L) {
     // during a walk the GPS symbol sits left of the time, which always
     // starts just after it, so the time never moves
     var hw = R.w / 2 - 4;
-    g.setFont("Vector", Math.min(fit(L.now, 18, hw - ICON_W - 2), fit(L.start, 18, hw)));
+    g.setFont("Vector", Math.min(fit(L.nowFull, 18, hw - ICON_W - 2), fit(L.start, 18, hw)));
     g.setFontAlign(-1, 0).drawString(L.now, R.x + ICON_W + 4, y);
     g.setFontAlign(1, 0).drawString(L.start, R.x2 - 3, y);
     drawIcon(gpsIcon());
   } else {
-    fit(L.now, 20, R.w - 4);
-    g.setFontAlign(0, 0).drawString(L.now, R.x + R.w / 2, y);
+    // sized and placed as the full HH:MM:SS, so HH:MM stays put when the
+    // seconds are left off while locked
+    fit(L.nowFull, 20, R.w - 4);
+    g.setFontAlign(-1, 0).drawString(L.now, R.x + (R.w - g.stringWidth(L.nowFull)) / 2, y);
   }
   g.setFontAlign(0, 0);
 }
