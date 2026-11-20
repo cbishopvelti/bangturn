@@ -357,7 +357,7 @@ test("Info: where GPS comes from, whether the watch's chip is on, last fix, batt
   spyMenu(h);
   h.tx("showWalkMenu()");
   h.tx('MENU["Info"]()');
-  assert.eq(menuItems(h), ["GPS via", "Watch GPS", "Last fix", "Battery"]);
+  assert.eq(menuItems(h), ["GPS via", "Watch GPS", "GPS apps", "Last fix", "Battery"]);
   assert.eq(h.eval("screen"), "menu", "the menu's timeout applies");
   assert.eq(h.eval('MENU["GPS via"].value'), "none yet");
   assert.eq(h.eval('MENU["Watch GPS"].value'), "off");
@@ -372,6 +372,8 @@ test("Info: where GPS comes from, whether the watch's chip is on, last fix, batt
   assert.eq(h.eval('MENU["Watch GPS"].value'), "ON");
   assert.eq(h.eval('MENU["Last fix"].value'), "1s ago");
   assert.eq(h.eval('MENU[""].selected'), 1, "stays on the row tapped");
+  h.tx('MENU["Last fix"].onchange()');
+  assert.eq(h.eval('MENU[""].selected'), 3);
   // the watch's own GPS, searching (no position: Last fix unchanged)
   h.tx('Bangle.emit("GPS",{fix:0,lat:NaN,lon:NaN,satellites:0,time:new Date()})');
   await h.wait(50);
@@ -394,4 +396,21 @@ test("Info closes when the walk ends", async h => {
   h.tx(`${BT}.cancel()`);
   await h.wait(100);
   assert.eq(h.eval("screen"), "main");
+});
+
+test("Info lists the apps holding GPS", async h => {
+  h.tx(`${BT}.start(${h.eval("Date.now()") - 5 * MIN})`);
+  await h.load("bangturn.app.js");
+  spyMenu(h);
+  // the firmware's list (the emulator has no GPS, so set it here)
+  h.tx('Bangle._PWR={GPS:["bangturn","gpsrec"],HRM:["health"]}');
+  h.tx("showInfo()");
+  assert.eq(h.eval('MENU["GPS apps"].value'), "bangturn, gpsrec");
+  h.tx('Bangle._PWR={HRM:["health"]}');
+  h.tx('MENU["GPS apps"].onchange()');
+  assert.eq(h.eval('MENU["GPS apps"].value'), "none");
+  assert.eq(h.eval('MENU[""].selected'), 2, "stays on the row tapped");
+  h.tx('delete Bangle._PWR');
+  h.tx('MENU["GPS apps"].onchange()');
+  assert.eq(h.eval('MENU["GPS apps"].value'), "none");
 });

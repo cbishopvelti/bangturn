@@ -11,8 +11,9 @@
    Swipe right goes back to the clock. The minutes-left widget is hidden.
    - menu:    (idle: Start walk, Length; the button goes back)
               during a walk: Resume, -1 min (offset shown), Cancel walk,
-              Info (GPS via phone/watch, Watch GPS chip on/off, last fix,
-              battery); back to the countdown after 10 s with no input
+              Info (GPS via phone/watch, Watch GPS chip on/off, the apps
+              holding GPS, last fix, battery); back to the countdown
+              after 10 s with no input
    Keep the startup alert hook at the bottom (see docs/ARCHITECTURE.md). */
 var bt = require("bangturn");
 var alerts = require("bangturn.alerts");
@@ -237,21 +238,34 @@ function ago(ms) {
   return s < 60 ? s + "s ago" : Math.floor(s / 60) + "m ago";
 }
 
+/* The apps holding GPS on, from the firmware's own list:
+   Bangle.setGPSPower(1, "app") adds "app" to Bangle._PWR.GPS, and GPS stays
+   powered while that list isn't empty ("?" is code that didn't give its
+   name). Android Integration's Overwrite GPS keeps the same list. */
+function gpsApps() {
+  var l = Bangle._PWR && Bangle._PWR.GPS;
+  return l && l.length ? l.join(", ") : "none";
+}
+
 /* Info (from the walk menu): where the speeds' GPS comes from, whether the
-   watch's own GPS chip (the big battery drain) is on, how old the last fix
-   is, and the battery. Tap a row to refresh; back returns to the walk menu. */
+   watch's own GPS chip (the big battery drain) is on, which apps have asked
+   for GPS, how old the last fix is, and the battery. Tap a row to refresh;
+   back returns to the walk menu. */
 function showInfo(selected) {
   stopTimers();
   screen = "menu"; // same 10 s timeout, and closes if the walk ends
   var src = speed.source();
   var menu = { "": { title: "Info", back: function () { showWalkMenu(3); }, selected: selected || 0 } };
-  function row(name, value, i) {
+  var n = 0;
+  function row(name, value) {
+    var i = n++;
     menu[name] = { value: value, onchange: function () { showInfo(i); } };
   }
-  row("GPS via", src.from || "none yet", 0);
-  row("Watch GPS", src.chip ? "ON" : "off", 1);
-  row("Last fix", src.fixAge === null ? "none" : ago(src.fixAge), 2);
-  row("Battery", E.getBattery() + "%", 3);
+  row("GPS via", src.from || "none yet");
+  row("Watch GPS", src.chip ? "ON" : "off");
+  row("GPS apps", gpsApps());
+  row("Last fix", src.fixAge === null ? "none" : ago(src.fixAge));
+  row("Battery", E.getBattery() + "%");
   E.showMenu(menu);
   startMenuTimer();
 }
