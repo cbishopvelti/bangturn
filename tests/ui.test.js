@@ -207,7 +207,7 @@ test("button on idle screen starts the walk", async h => {
   assert.eq(h.eval("screen"), "main");
 });
 
-test("button while running opens the menu: Resume, -1 min, Cancel walk", async h => {
+test("button while running opens the menu: Resume, -1 min, Cancel walk, GPS rows", async h => {
   h.tx(`${BT}.start(${h.eval("Date.now()") - 5 * MIN})`);
   await h.load("bangturn.app.js");
   spyMenu(h);
@@ -215,7 +215,7 @@ test("button while running opens the menu: Resume, -1 min, Cancel walk", async h
   press(h);
   await h.wait(100);
   assert.eq(h.eval("screen"), "menu");
-  assert.eq(menuItems(h), ["Resume", "-1 min", "Cancel walk"]);
+  assert.eq(menuItems(h), ["Resume", "-1 min", "Cancel walk", "GPS via", "Watch GPS"]);
   h.tx('MENU["Resume"]()');
   assert.eq(h.eval("screen"), "main");
   assert.eq(h.eval("MENU"), null, "menu closed");
@@ -230,11 +230,11 @@ test("-1 min shows the offset and stays in the menu", async h => {
   h.tx("showWalkMenu()");
   h.tx('MENU["-1 min"]()');
   assert.eq(h.eval("screen"), "menu");
-  assert.eq(menuItems(h), ["Resume", "-1 min (-1)", "Cancel walk"]);
+  assert.eq(menuItems(h), ["Resume", "-1 min (-1)", "Cancel walk", "GPS via", "Watch GPS"]);
   assert.eq(h.eval('MENU[""].selected'), 1, "keeps -1 min selected");
   h.tx('MENU["-1 min (-1)"]()');
   h.tx('MENU["-1 min (-2)"]()');
-  assert.eq(menuItems(h), ["Resume", "-1 min (-3)", "Cancel walk"]);
+  assert.eq(menuItems(h), ["Resume", "-1 min (-3)", "Cancel walk", "GPS via", "Watch GPS"]);
   assert.eq(h.eval(`${BT}.read().offset`), 3);
   h.tx('MENU["Resume"]()');
   const t = screenText(h);
@@ -313,4 +313,28 @@ test("turnaround alert then the countdown", async h => {
   await h.wait(7000); // the alarm stops after at most 6 s
   assert.eq(h.eval("screen"), "main");
   assert.eq(screenText(h).rows.length, 2, "Out and Back rows");
+});
+
+test("the menu's GPS rows: where GPS comes from and whether the watch's chip is on", async h => {
+  h.tx(`${BT}.start(${h.eval("Date.now()") - 5 * MIN})`);
+  await h.load("bangturn.app.js");
+  spyMenu(h);
+  h.tx("showWalkMenu()");
+  assert.eq(h.eval('MENU["GPS via"].value'), "none yet");
+  assert.eq(h.eval('MENU["Watch GPS"].value'), "off");
+  // a fix from the phone (Gadgetbridge marks them externalSource), with the
+  // chip still on (as just after an app loads); tapping a row refreshes
+  h.tx('Bangle.getGPSFix=function(){return {fix:0}};Bangle.emit("GPS",{fix:1,lat:51.5,lon:-0.12,hdop:1,satellites:8,time:new Date(),externalSource:true})');
+  await h.wait(50);
+  h.tx('MENU["Watch GPS"].onchange()');
+  assert.eq(h.eval('MENU["GPS via"].value'), "phone");
+  assert.eq(h.eval('MENU["Watch GPS"].value'), "ON");
+  assert.eq(h.eval('MENU[""].selected'), 4, "stays on the row tapped");
+  assert.eq(h.eval("screen"), "menu");
+  // the watch's own GPS
+  h.tx('Bangle.emit("GPS",{fix:0,lat:NaN,lon:NaN,satellites:0,time:new Date()})');
+  await h.wait(50);
+  h.tx('MENU["GPS via"].onchange()');
+  assert.eq(h.eval('MENU["GPS via"].value'), "watch");
+  assert.eq(h.eval('MENU[""].selected'), 3);
 });

@@ -143,8 +143,15 @@ To tell BangTurn from a faulty watch:
    isn't BangTurn: check the Health app's heart rate setting and the
    backlight timeout. To be sure, uninstall BangTurn and repeat.
 3. Note the battery before and after one walk to see what a walk costs.
-4. The Power Manager app's widget shows a G while something has GPS on, and
-   its logging can show which code keeps waking the watch.
+4. During a walk, press the button and scroll down the menu. **GPS via**
+   says where the last GPS fix came from (phone, or watch for its own GPS)
+   and **Watch GPS** says whether the watch's GPS chip is powered, asked of
+   the firmware itself. With the phone supplying GPS it should read phone
+   and off, a few seconds after the walk starts or you open BangTurn (the
+   watch's GPS runs until the phone's first fix arrives). Tap either row to
+   refresh it. If it says watch and ON, the phone isn't supplying GPS.
+5. The Power Manager app's logging can show which code keeps waking the
+   watch.
 
 A watch that still drains fast with nothing installed beyond the defaults
 may be faulty: Espruino's forum and support can help.
