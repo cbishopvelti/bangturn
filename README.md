@@ -138,26 +138,50 @@ What to expect (the emulator can't measure power, so these are rough):
   should cost the watch much less. The phone's battery pays instead. If the
   phone stops sending fixes, the watch's own GPS takes over.
 
+To use the phone's GPS, all three of these are needed (otherwise every
+walk runs the watch's own GPS):
+
+- On the watch: Settings > Apps > Android Integration > **Overwrite GPS** on.
+- In Gadgetbridge on the phone: the Bangle.js device's settings (the gear on
+  its card) > Location > **Use phone gps data** on. It is off by default;
+  while it's off, Gadgetbridge shows "Phone gps data update is deactivated
+  in the settings" on the phone when a walk starts.
+- Gadgetbridge allowed to use the phone's location: in Gadgetbridge's own
+  Settings > Location, press **Acquire location** (it asks for the location
+  permission; this is what fixed it for Chris) and leave **Keep location
+  updated** on (Gadgetbridge drops phone fixes while it's off). The phone's
+  location must be on too.
+
+Info's **Phone GPS** row (below) says which of these is missing. During a
+walk, the symbol left of the time of day (top row) shows it at a glance: a phone
+when the speeds come from the phone's GPS, a red crosshair while the watch's
+own GPS chip is on (the battery drain), blank before any GPS.
+
 To tell BangTurn from a faulty watch:
 
-1. Check Settings > Apps > Android Integration > Overwrite GPS is on, if you
-   mean the phone to supply GPS. If it's off, every walk runs the watch's GPS.
+1. Check phone GPS is set up as above, if you mean the phone to supply GPS.
 2. Charge to 100% and leave the watch on the clock for a day with no walk.
    BangTurn does nothing then, so a big drop (say over 15 to 20% in a day)
    isn't BangTurn: check the Health app's heart rate setting and the
    backlight timeout. To be sure, uninstall BangTurn and repeat.
 3. Note the battery before and after one walk to see what a walk costs.
-4. During a walk, press the button and choose **Info**. **GPS via**
+4. Press the button and choose **Info** (during a walk, or from the start
+   screen's menu). **GPS via**
    says where the last GPS fix came from (phone, or watch for its own GPS)
    and **Watch GPS** says whether the watch's GPS chip is powered, asked of
-   the firmware itself. With the phone supplying GPS it should read phone
+   the firmware itself. **Phone GPS** checks the phone GPS setup: "working",
+   "setting off" (Overwrite GPS is off on the watch), "no Bluetooth" (not
+   connected to Gadgetbridge) or "no fixes" (asked, but Gadgetbridge sends
+   nothing: turn on Use phone gps data, and press Acquire location in
+   Gadgetbridge's Settings > Location).
+   With the phone supplying GPS it should read phone
    and off, a few seconds after the walk starts or you open BangTurn (the
    watch's GPS runs until the phone's first fix arrives). **Last fix** says
    how long ago GPS last gave a position, and **Battery** the charge left.
    **GPS apps** lists every app that has asked for GPS (BangTurn shows as
    bangturn), from the firmware's own list. If an app other than bangturn
-   is there, it's keeping GPS on too. With phone GPS an app can be listed while the chip is off:
-   Watch GPS says whether the chip itself is on.
+   is there, it's keeping GPS on too. With phone GPS an app can be listed
+   while the chip is off: Watch GPS says whether the chip itself is on.
    Tap a row to refresh it. If it says watch and ON, the phone isn't
    supplying GPS.
 5. The Power Manager app's logging can show which code keeps waking the

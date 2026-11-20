@@ -8,7 +8,8 @@ const BT = 'require("bangturn")';
 
 /* Replace the speed module with one that returns global.SP from get().
    resume() and event() are what bangturn.boot.js calls during a walk. */
-var FAKE_SPEED = "exports.resume=exports.event=function(){};exports.get=function(){GET}";
+var FAKE_SPEED = "exports.resume=exports.event=function(){};exports.get=function(){GET};" +
+  "exports.source=function(){return {from:null,chip:false,fixAge:null}};";
 function fakeSpeed(h, get) {
   var src = FAKE_SPEED.replace("GET", get === undefined ? "return global.SP||{out:null,back:null}" : get);
   h.tx(`require("Storage").write("bangturn.speed",${JSON.stringify(src)})`);
@@ -206,7 +207,7 @@ test("button on idle screen opens the idle menu and never starts a walk", async 
   await h.wait(100);
   assert(!h.eval(`${BT}.isActive()`), "no walk started");
   assert.eq(h.eval("screen"), "menu");
-  assert.eq(menuItems(h), ["Length: 60 min"]);
+  assert.eq(menuItems(h), ["Length: 60 min", "Info"]);
   // the menu's back (what the button does in a menu) returns to idle
   h.tx('MENU[""].back()');
   assert.eq(h.eval("screen"), "main");
@@ -346,7 +347,7 @@ test("Info: where GPS comes from, whether the watch's chip is on, last fix, batt
   spyMenu(h);
   h.tx("showWalkMenu()");
   h.tx('MENU["Info"]()');
-  assert.eq(menuItems(h), ["GPS via", "Watch GPS", "GPS apps", "Last fix", "Battery"]);
+  assert.eq(menuItems(h), ["GPS via", "Watch GPS", "Phone GPS", "GPS apps", "Last fix", "Battery"]);
   assert.eq(h.eval("screen"), "menu", "the menu's timeout applies");
   assert.eq(h.eval('MENU["GPS via"].value'), "none yet");
   assert.eq(h.eval('MENU["Watch GPS"].value'), "off");
@@ -362,7 +363,7 @@ test("Info: where GPS comes from, whether the watch's chip is on, last fix, batt
   assert.eq(h.eval('MENU["Last fix"].value'), "1s ago");
   assert.eq(h.eval('MENU[""].selected'), 1, "stays on the row tapped");
   h.tx('MENU["Last fix"].onchange()');
-  assert.eq(h.eval('MENU[""].selected'), 3);
+  assert.eq(h.eval('MENU[""].selected'), 4);
   // the watch's own GPS, searching (no position: Last fix unchanged)
   h.tx('Bangle.emit("GPS",{fix:0,lat:NaN,lon:NaN,satellites:0,time:new Date()})');
   await h.wait(50);
@@ -398,8 +399,65 @@ test("Info lists the apps holding GPS", async h => {
   h.tx('Bangle._PWR={HRM:["health"]}');
   h.tx('MENU["GPS apps"].onchange()');
   assert.eq(h.eval('MENU["GPS apps"].value'), "none");
-  assert.eq(h.eval('MENU[""].selected'), 2, "stays on the row tapped");
+  assert.eq(h.eval('MENU[""].selected'), 3, "stays on the row tapped");
   h.tx('delete Bangle._PWR');
   h.tx('MENU["GPS apps"].onchange()');
   assert.eq(h.eval('MENU["GPS apps"].value'), "none");
+});
+
+test("Info's Phone GPS names the first missing link", async h => {
+  h.tx(`${BT}.start(${h.eval("Date.now()") - 5 * MIN})`);
+  await h.load("bangturn.app.js");
+  spyMenu(h);
+  const phone = () => { h.tx("showInfo()"); return h.eval('MENU["Phone GPS"].value'); };
+  assert.eq(phone(), "setting off", "no Android Integration Overwrite GPS");
+  h.tx("Bangle.moveGPSPower=function(){}"); // what Overwrite GPS defines
+  h.tx("NRF.getSecurityStatus=function(){return {connected:false}}");
+  assert.eq(phone(), "no Bluetooth");
+  h.tx("NRF.getSecurityStatus=function(){return {connected:true}}");
+  assert.eq(phone(), "no fixes", "connected, but Gadgetbridge sends nothing");
+  h.tx('Bangle.emit("GPS",{fix:1,lat:51.5,lon:-0.12,hdop:1,satellites:8,time:new Date(),externalSource:true})');
+  await h.wait(50);
+  assert.eq(phone(), "working");
+});
+
+test("Info from the start screen's menu, and back to that menu", async h => {
+  await h.load("bangturn.app.js");
+  spyMenu(h);
+  h.tx("showIdleMenu()");
+  h.tx('MENU["Info"]()');
+  assert.eq(menuItems(h), ["GPS via", "Watch GPS", "Phone GPS", "GPS apps", "Last fix", "Battery"]);
+  assert.eq(h.eval('MENU["GPS via"].value'), "none yet");
+  h.tx("Bangle.moveGPSPower=function(){};NRF.getSecurityStatus=function(){return {connected:true}}");
+  h.tx('MENU["Phone GPS"].onchange()');
+  assert.eq(h.eval('MENU["Phone GPS"].value'), "no walk", "nothing asks for GPS without a walk");
+  h.tx('MENU[""].back()');
+  assert.eq(menuItems(h), ["Length: 60 min", "Info"]);
+  assert.eq(h.eval('MENU[""].selected'), 1, "back on Info");
+  assert.eq(h.eval(`${BT}.isActive()`), false, "no walk started");
+});
+
+test("walk screen: GPS symbol shows phone or watch, and follows GPS events", async h => {
+  await h.load("bangturn.app.js");
+  assert.eq(h.eval("drawnIcon===undefined"), true, "no symbol on the start screen");
+  h.tx(`${BT}.start(${h.eval("Date.now()") - 5 * MIN})`);
+  await h.wait(200);
+  assert.eq(h.eval("drawnIcon"), "", "no GPS yet: blank");
+  // phone fixes with the chip off: phone
+  h.tx('Bangle.emit("GPS",{fix:1,lat:51.5,lon:-0.12,hdop:1,satellites:8,time:new Date(),externalSource:true})');
+  await h.wait(100);
+  assert.eq(h.eval("drawnIcon"), "phone");
+  const R = h.eval("Bangle.appRect");
+  assert.eq(h.eval(`g.getPixel(${R.x + 8},${R.y + 7})`), h.eval('g.toColor("#0f0")'), "green location pin on the phone");
+  // the watch's chip on (its events come every second): watch, in red
+  h.tx('Bangle.getGPSFix=function(){return {fix:0}};Bangle.emit("GPS",{fix:0,lat:NaN,lon:NaN,satellites:0,time:new Date()})');
+  await h.wait(100);
+  assert.eq(h.eval("drawnIcon"), "watch");
+  assert.eq(h.eval(`g.getPixel(${R.x + 8},${R.y + 12})`), h.eval('g.toColor("#f00")'), "red crosshair centre, left of the time");
+  // the symbol survives a full redraw
+  h.tx("tick()");
+  assert.eq(h.eval("drawnIcon"), "watch");
+  h.tx(`${BT}.cancel()`);
+  await h.wait(200);
+  assert.eq(h.eval("drawnIcon===undefined"), true, "gone when the walk ends");
 });

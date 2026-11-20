@@ -9,10 +9,10 @@
               in the same place, while locked), average speed rows,
               progress bar
    Swipe right goes back to the clock. The minutes-left widget is hidden.
-   - menu:    (idle: Length; the button goes back)
+   - menu:    (idle: Length, Info; the button goes back)
               during a walk: Resume, -1 min (offset shown), Cancel walk,
-              Info (GPS via phone/watch, Watch GPS chip on/off, the apps
-              holding GPS, last fix, battery); back to the countdown
+              Info (GPS via phone/watch, Watch GPS chip on/off, Phone GPS
+              setup check, the apps holding GPS, last fix, battery); back to the countdown
               after 10 s with no input
    Keep the startup alert hook at the bottom (see docs/ARCHITECTURE.md). */
 var bt = require("bangturn");
@@ -82,10 +82,13 @@ function drawClock(L) {
   var R = Bangle.appRect, y = R.y + 12;
   g.reset().clearRect(R.x, y - 11, R.x2, y + 11);
   if (L.start) {
+    // during a walk the GPS symbol sits left of the time, which always
+    // starts just after it, so the time never moves
     var hw = R.w / 2 - 4;
-    g.setFont("Vector", Math.min(fit(L.nowFull, 18, hw), fit(L.start, 18, hw)));
-    g.setFontAlign(-1, 0).drawString(L.now, R.x + 3, y);
+    g.setFont("Vector", Math.min(fit(L.nowFull, 18, hw - ICON_W - 2), fit(L.start, 18, hw)));
+    g.setFontAlign(-1, 0).drawString(L.now, R.x + ICON_W + 4, y);
     g.setFontAlign(1, 0).drawString(L.start, R.x2 - 3, y);
+    drawIcon(gpsIcon());
   } else {
     // sized and placed as the full HH:MM:SS, so HH:MM stays put when the
     // seconds are left off while locked
@@ -95,12 +98,53 @@ function drawClock(L) {
   g.setFontAlign(0, 0);
 }
 
+/* The GPS symbol left of the time of day (top row) during a walk: where the
+   speeds' GPS comes from, from the same facts as Info.
+   "watch": the watch's own GPS chip is on (red: the big battery drain);
+   "phone": the phone's fixes are arriving and the chip is off (green phone
+     with a location pin);
+   "": no GPS yet. Redrawn on its own when it changes (see onGPSIcon). */
+var ICON_W = 16;
+var drawnIcon; // the symbol on screen now
+function gpsIcon(s) {
+  s = s || speed.source();
+  return s.chip ? "watch" : s.from == "phone" ? "phone" : "";
+}
+function drawIcon(k) {
+  drawnIcon = k;
+  var R = Bangle.appRect, cx = R.x + ICON_W / 2, cy = R.y + 12;
+  g.reset().clearRect(R.x, cy - 10, R.x + ICON_W, cy + 10);
+  if (k == "phone") { // a phone giving its location: a pin on its screen, in green
+    g.setColor("#0f0") // pure green: the 3-bit screen dithers darker greens
+      .drawRect({ x: cx - 6, y: cy - 10, w: 13, h: 21, r: 2 })
+      .drawRect({ x: cx - 5, y: cy - 9, w: 11, h: 19, r: 2 })
+      .fillRect(cx - 1, cy + 7, cx + 1, cy + 7) // the button
+      .fillCircle(cx, cy - 3, 3) // the pin's head...
+      .fillPoly([cx - 3, cy - 2, cx + 3, cy - 2, cx, cy + 4]) // ...and point
+      .setColor(g.theme.bg).fillRect(cx, cy - 3, cx, cy - 3); // its hole
+  } else if (k == "watch") { // a GPS crosshair, in red
+    g.setColor(g.theme.dark ? "#f44" : "#f00")
+      .drawCircle(cx, cy, 5).drawCircle(cx, cy, 4).fillCircle(cx, cy, 1)
+      .fillRect(cx - 8, cy, cx - 5, cy).fillRect(cx + 5, cy, cx + 8, cy)
+      .fillRect(cx, cy - 8, cx, cy - 5).fillRect(cx, cy + 5, cx, cy + 8);
+  }
+}
+/* GPS events already wake the watch (the speed tracker listens), so the
+   symbol follows them: redraw it only when it changes. */
+function onGPSIcon(f) {
+  if (screen != "main" || drawnIcon === undefined) return;
+  // from the event itself: the speed tracker may not have seen it yet
+  var k = gpsIcon({ chip: Bangle.getGPSFix() !== undefined, from: f.externalSource ? "phone" : "watch" });
+  if (k != drawnIcon) drawIcon(k);
+}
+
 /* Draws the main screen; returns the status it drew */
 function draw(st) {
   st = st || bt.status();
   var L = lines(st);
   var R = Bangle.appRect, x = R.x + R.w / 2, w = R.w - 4, y = R.y;
   g.reset().clearRect(R).setFontAlign(0, 0);
+  drawnIcon = undefined; // drawn again with the time row during a walk
   // sized and placed as the full m:ss, so the minutes don't move when the
   // seconds are left off
   fit(L.full, 46, w);
@@ -207,11 +251,12 @@ function start() {
 
 /* Before a walk: set the length (a tap on the idle screen starts it). Back (or the button) returns
    to the idle screen without starting anything. */
-function showIdleMenu() {
+function showIdleMenu(selected) {
   stopTimers();
   screen = "menu";
-  var menu = { "": { title: "BangTurn", back: showMain } };
+  var menu = { "": { title: "BangTurn", back: showMain, selected: selected || 0 } };
   menu["Length: " + bt.getMins() + " min"] = function () { stopMenuTimer(); showPicker(); };
+  menu["Info"] = function () { showInfo(); };
   E.showMenu(menu);
   startMenuTimer();
 }
@@ -247,15 +292,33 @@ function gpsApps() {
   return l && l.length ? l.join(", ") : "none";
 }
 
-/* Info (from the walk menu): where the speeds' GPS comes from, whether the
-   watch's own GPS chip (the big battery drain) is on, which apps have asked
-   for GPS, how old the last fix is, and the battery. Tap a row to refresh;
-   back returns to the walk menu. */
+/* Why the phone isn't (or is) supplying GPS, for Info. The phone's GPS
+   needs three links, and this names the first one missing:
+   - Android Integration's "Overwrite GPS" on: it then defines
+     Bangle.moveGPSPower and passes GPS requests to the phone.
+   - Bluetooth connected to Gadgetbridge.
+   - Gadgetbridge sending fixes: its Bangle.js device setting "Use phone gps
+     data" (off by default), and location permission plus "Keep location
+     updated" (Gadgetbridge Settings > Location > Acquire location). The
+     watch can't read those, so if fixes don't come it says "no fixes". */
+function phoneGPS(src) {
+  if (typeof Bangle.moveGPSPower != "function") return "setting off";
+  if (!NRF.getSecurityStatus().connected) return "no Bluetooth";
+  if (src.from == "phone") return "working";
+  return bt.isActive() ? "no fixes" : "no walk"; // only asked for during a walk
+}
+
+/* Info (from the walk menu, or the start screen's menu): where the speeds'
+   GPS comes from, whether the watch's own GPS chip (the big battery drain)
+   is on, which apps have asked for GPS, how old the last fix is, and the
+   battery. Tap a row to refresh; back returns to the menu it came from. */
 function showInfo(selected) {
   stopTimers();
   screen = "menu"; // same 10 s timeout, and closes if the walk ends
   var src = speed.source();
-  var menu = { "": { title: "Info", back: function () { showWalkMenu(3); }, selected: selected || 0 } };
+  var menu = { "": { title: "Info", selected: selected || 0, back: function () {
+    if (bt.isActive()) showWalkMenu(3); else showIdleMenu(1);
+  } } };
   var n = 0;
   function row(name, value) {
     var i = n++;
@@ -263,6 +326,7 @@ function showInfo(selected) {
   }
   row("GPS via", src.from || "none yet");
   row("Watch GPS", src.chip ? "ON" : "off");
+  row("Phone GPS", phoneGPS(src));
   row("GPS apps", gpsApps());
   row("Last fix", src.fixAge === null ? "none" : ago(src.fixAge));
   row("Battery", E.getBattery() + "%");
@@ -278,6 +342,7 @@ function onLock() { if (screen == "main") tick(); }
 
 Bangle.on("bangturn", onEvent);
 Bangle.on("lock", onLock);
+Bangle.on("GPS", onGPSIcon);
 Bangle.on("touch", onMenuInput);
 Bangle.on("drag", onMenuInput);
 Bangle.drawWidgets();
