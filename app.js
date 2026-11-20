@@ -1,9 +1,9 @@
 /* BangTurn app, installed as "bangturn.app.js".
    OWNED BY: UI task. Screens and menu from docs/spec.md "UI":
    - idle:    60:00 (the walk length), time of day, "Tap to start";
-              swipe left opens the walk length picker (bangturn.picker).
+              no swipe for the length (another app on the watch uses swipes).
               The button never starts a walk (it's pressed just to get
-              around): it opens the idle menu (Length); a tap starts
+              around): it opens the idle menu (Length, the picker); a tap starts
    - running: small row with the time of day and the walk's start time,
               big m:ss countdown of the whole walk (just the minutes,
               in the same place, while locked), average speed rows,
@@ -66,7 +66,7 @@ function lines(st, now) {
   var L = { full: full, time: st.active && locked ? "" + bt.mins(st.remaining) : full, rows: [] };
   L.now = hms(now, !locked);
   if (st.active) L.start = "Start " + hms(bt.startTime(), true);
-  if (!st.active) L.rows.push("Tap to start", "< Swipe: length");
+  if (!st.active) L.rows.push("Tap to start", "Button: length");
   else {
     var sp = speed.get() || {};
     L.rows.push("Out " + kph(sp.out));
@@ -177,12 +177,10 @@ function showMain() {
     // in the menu it comes back here
     btn: function () { if (bt.isActive()) showWalkMenu(); else showIdleMenu(); },
     touch: function () { if (!bt.isActive()) start(); },
-    // swipe right: back to the clock (the walk keeps running);
-    // swipe left before a walk: set the walk length
-    swipe: function (lr) {
-      if (lr > 0) load();
-      else if (lr < 0 && !bt.isActive()) showPicker();
-    }
+    // swipe right: back to the clock (the walk keeps running). No left
+    // swipe: another app on the watch uses swipes, so the length is in
+    // the button menu
+    swipe: function (lr) { if (lr > 0) load(); }
   });
   tick();
 }
