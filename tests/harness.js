@@ -68,12 +68,20 @@ async function create(opts) {
   /* Evaluate on the watch and return the value (via JSON, between
      \x01..\x02 markers on the serial output so long values survive). */
   h.eval = js => {
-    rx = "";
-    emu.tx(`\x10print("\\x01"+JSON.stringify(${js})+"\\x02")\n`);
-    const m = /\x01([^]*?)\x02/.exec(rx);
-    if (!m) throw new Error(`eval(${js}) failed: ${rx.trim()}`);
-    if (m[1] === "undefined") return undefined;
-    return JSON.parse(m[1]);
+    // A load() on the watch (sched opening the app, say) resets the REPL. If
+    // that lands while this command is being sent, the watch only sees the
+    // tail of it and answers with a syntax or reference error and no markers.
+    // So with no answer, ask again; the errors of a cut command don't count.
+    for (let tries = 0; ; tries++) {
+      const errs = h.errors.length;
+      rx = "";
+      emu.tx(`\x10print("\\x01"+JSON.stringify(${js})+"\\x02")\n`);
+      const m = /\x01([^]*?)\x02/.exec(rx);
+      if (m) return m[1] === "undefined" ? undefined : JSON.parse(m[1]);
+      if (tries >= 2) throw new Error(`eval(${js}) failed: ${rx.trim()}`);
+      const cut = h.errors.splice(errs).filter(e => !/Uncaught (Syntax|Reference)Error/.test(e));
+      h.errors.push(...cut);
+    }
   };
 
   h.wait = async ms => { await sleep(ms); emu.idle(); };
