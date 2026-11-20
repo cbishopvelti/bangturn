@@ -73,7 +73,7 @@ function lines(st, now) {
   L.dim = locked ? hms(now, true).substr(5) : "";
   L.nowFull = hms(now, true); // for layout, so HH:MM doesn't move when locked
   if (st.active) L.start = "Start " + hms(bt.startTime(), true);
-  if (!st.active) L.rows.push("Tap to start", "Button: length");
+  if (!st.active) L.rows.push("Tap to start");
   else {
     var sp = speed.get() || {};
     L.rows.push("Out " + kph(sp.out));
