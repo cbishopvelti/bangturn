@@ -88,10 +88,12 @@ test("widget and GPS follow the walk's own length", async h => {
   assert.eq(h.eval(`${BT}.isActive()`), true, "walk not ended at an hour");
 });
 
-test("idle screen: swipe left opens the wheels, drag sets hours and minutes", async h => {
+test("idle screen: Length in the button menu opens the wheels, drag sets hours and minutes", async h => {
   await h.load("bangturn.app.js");
+  h.tx(`global.MENU=null;(function(o){E.showMenu=function(m){MENU=m||null;return o.apply(E,arguments)}})(E.showMenu)`);
+  h.tx("showIdleMenu()");
   captureButton(h);
-  h.tx('Bangle.emit("swipe",-1,0)');
+  h.tx('MENU["Length: 60 min"]()');
   assert.eq(h.eval("screen"), "picker");
   // minutes wheel (right): drag up two rows: 60 -> 1 h 2 min
   drag(h, 130, -15, 4);
@@ -120,11 +122,16 @@ test("the wheels wrap round and show the total in minutes", async h => {
   assert.eq(h.eval("GOT"), 570);
 });
 
-test("swipe left during a walk does nothing", async h => {
-  h.tx(`${BT}.start()`);
+test("swipe left does nothing, before or during a walk (another app uses swipes)", async h => {
   await h.load("bangturn.app.js");
   h.tx('Bangle.emit("swipe",-1,0)');
-  assert.eq(h.eval("screen"), "main");
+  await h.wait(100);
+  assert.eq(h.eval("screen"), "main", "idle: no picker");
+  assert.eq(h.eval("global.__FILE__"), "bangturn.app.js");
+  h.tx(`${BT}.start()`);
+  h.tx('Bangle.emit("swipe",-1,0)');
+  await h.wait(100);
+  assert.eq(h.eval("screen"), "main", "walk: nothing");
 });
 
 test("Settings > Apps > BangTurn: walk length opens the wheels and saves", async h => {
