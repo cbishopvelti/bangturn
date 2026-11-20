@@ -14,7 +14,7 @@ var T = exports.T = {
   long: 600,       // turnaround buzz on
   longGap: 200,    // turnaround buzz off
   turnMax: 6000,   // turnaround alarm stops after this
-  settle: 500      // after the last buzz, before twist/tap wake-ups return
+  settle: 500      // after the last countdown buzz, still re-lock an unlock
 };
 
 /* One short confirmation buzz when a walk starts. Called by the app. */
@@ -24,34 +24,15 @@ exports.started = function () {
 
 /* Buzzing shakes the accelerometer, and on a real Bangle.js 2 that can
    read as a twist or a tap, which unlocks the watch and lights it (Chris
-   saw this on the countdown buzzes). While we buzz, hold() turns those
-   wake-ups off; release() puts the user's settings back a moment after the
-   last buzz stops. A load() also restores them, as boot code re-applies
-   the settings. Calls nest. */
-var WAKES = ["wakeOnTwist", "wakeOnDoubleTap", "wakeOnFaceUp"];
-var saved, holds = 0, restoreTimer;
-function hold() {
-  if (restoreTimer) { clearTimeout(restoreTimer); restoreTimer = undefined; }
-  if (holds++ || saved) return;
-  var o = Bangle.getOptions(), off = {};
-  saved = {};
-  WAKES.forEach(function (k) { saved[k] = o[k]; off[k] = false; });
-  Bangle.setOptions(off);
-}
-function release() {
-  if (holds <= 0 || --holds) return;
-  restoreTimer = setTimeout(function () {
-    restoreTimer = undefined;
-    if (saved && !holds) { Bangle.setOptions(saved); saved = undefined; }
-  }, T.settle);
-}
-exports.hold = hold;       // for tests
-exports.release = release;
+   saw this on the countdown buzzes). The user's twist and tap wake-ups
+   stay on (Chris wants them), so instead: a countdown locks the watch
+   again if it unlocks while buzzing, and the turnaround alarm doesn't
+   treat an unlock as "seen it" (only a button press or a tap stops it). */
 
 /* Walk-back countdown: n short buzzes (1 at 15 min left, 2 at 8, 3 at 4,
    4 at 1). Runs inside whatever app is open: no drawing, no load(). Must
    not unlock the watch or light the screen: if the watch was locked and
-   unlocks while we buzz anyway, it is locked again. */
+   unlocks while we buzz (or just after, T.settle), it is locked again. */
 exports.countdown = function (n) {
   var i = 0, wasLocked = Bangle.isLocked();
   var wasLit = Bangle.isBacklightOn ? Bangle.isBacklightOn() : Bangle.isLCDOn();
@@ -60,12 +41,10 @@ exports.countdown = function (n) {
     Bangle.setLocked(true);
     if (!wasLit) Bangle.setLCDPower(0);
   }
-  hold();
   Bangle.on("lock", onLock);
   (function next() {
-    if (i++ >= n) { // last buzz done (wake-ups return T.settle later)
-      Bangle.removeListener("lock", onLock);
-      release();
+    if (i++ >= n) { // last buzz done; the shake can be read a moment later
+      setTimeout(function () { Bangle.removeListener("lock", onLock); }, T.settle);
       return;
     }
     Bangle.buzz(T.short, 1);
@@ -79,10 +58,12 @@ var active;
 
 /* Turnaround alarm. Called by the app at startup when
    require("bangturn").takeAlert() returns "turn". Lights the screen, shows
-   "TURN AROUND" full screen and repeats long full-strength buzzes until the
-   watch unlocks (lock event with false), a button press or tap, or 6 s,
-   whichever comes first. No repeats after that. Twist, tap and face-up
-   wake-ups are off while it runs, so the buzzing can't unlock it. Then calls done() once.
+   "TURN AROUND" full screen and repeats long full-strength buzzes until a
+   button press, a tap on the screen, or 6 s, whichever comes first. No
+   repeats after that. An unlock alone doesn't stop it, since the buzzing
+   itself can unlock the watch (a twist or tap read from the vibration).
+   The button works locked or not; a tap works once the watch is unlocked.
+   Then calls done() once.
    Returns a function that stops the alarm early. */
 exports.turnaround = function (done) {
   if (active) active(); // stop (and complete) any alarm already running
@@ -100,7 +81,8 @@ exports.turnaround = function (done) {
     g.reset();
   }
 
-  function onLock(locked) { if (!locked) stop(); }
+  // an unlock makes widgets (or the clock) redraw: draw the alarm again
+  function onLock() { setTimeout(function () { if (!stopped) draw(); }, 50); }
 
   function buzz() {
     if (stopped) return;
@@ -118,7 +100,6 @@ exports.turnaround = function (done) {
     Bangle.removeListener("lock", onLock);
     if (btnWatch) clearWatch(btnWatch);
     try { digitalWrite(VIBRATE, 0); } catch (e) {} // cut a buzz mid-way
-    release();
     Bangle.setUI();
     g.reset().clear();
     if (global.WIDGETS) Bangle.drawWidgets();
@@ -126,9 +107,6 @@ exports.turnaround = function (done) {
   }
 
   active = stop;
-  // Only a real look stops it: the buzzing mustn't fake a twist or tap that
-  // unlocks the watch (which would end the alarm after one buzz).
-  hold();
   // setUI drops the app's own handlers while the alarm shows; the button is
   // our own watch (one press, then cleared in stop()).
   Bangle.setUI({ mode: "custom", touch: stop });

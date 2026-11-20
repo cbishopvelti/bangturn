@@ -131,8 +131,12 @@ test("a whole walk: start, turnaround alarm, countdown buzzes, silent end", asyn
   const long = buzzes(h);
   assert(long.length >= 2 && long.every(b => b == 600), "long alarm buzzes: " + JSON.stringify(long));
   assert.eq([state(h).turned, state(h).alert], [true, undefined], "turned, alert taken");
-  // Raising the wrist unlocks the watch: the alarm stops, the countdown shows
+  // Unlocking alone doesn't stop it (the buzz itself can unlock the watch)
   h.tx("Bangle.setLocked(false)");
+  await h.wait(900);
+  assert(buzzes(h).length > long.length, "still buzzing after an unlock");
+  // A tap does: the alarm stops, the countdown shows
+  h.tx("Bangle.emit('touch',1,{x:88,y:88,type:0})");
   await h.wait(300);
   const n = buzzes(h).length;
   await h.wait(1000);
@@ -307,7 +311,7 @@ test("watch off across the turnaround: late alarm at boot, missed buzz skipped",
   const b = buzzes(h);
   assert(b.length && b.every(x => x == 600), "turnaround alarm only: " + JSON.stringify(b));
   assert.eq(ids(h), ["left8", "left4", "left1", "end"], "missed entries dropped");
-  h.tx("Bangle.setLocked(false);Bangle.emit('lock',false)");
+  h.tx("Bangle.setLocked(false);Bangle.emit('touch',1,{x:88,y:88,type:0})"); // tap to dismiss
   await h.wait(300);
   assert.eq(screen(h).rows.length, 2, "Out and Back rows");
 });
