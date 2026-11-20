@@ -18,7 +18,7 @@ function fakeSpeed(h, get) {
    on its own below, since it changes as the test runs) */
 function screenText(h) {
   const L = h.eval(`lines(${BT}.status())`);
-  delete L.now; delete L.nowFull;
+  delete L.now; delete L.nowFull; delete L.dim; delete L.timeDim;
   delete L.full;
   return L;
 }
@@ -61,13 +61,40 @@ test("idle screen: 60:00, time of day, tap to start", async h => {
   assert(!drawn.some(s => s.indexOf("Turn around") >= 0), "no turnaround line");
 });
 
-test("time of day has seconds while unlocked, not while locked", async h => {
+test("time of day has seconds while unlocked, grey seconds while locked", async h => {
   await h.load("bangturn.app.js");
   const t = h.eval("new Date(2026,10,19,9,5,7).getTime()");
   h.tx("Bangle.setLocked(false)");
   assert.eq(h.eval(`lines(${BT}.status(),${t}).now`), "09:05:07");
+  assert.eq(h.eval(`lines(${BT}.status(),${t}).dim`), "");
   h.tx("Bangle.setLocked(true)");
   assert.eq(h.eval(`lines(${BT}.status(),${t}).now`), "09:05");
+  assert.eq(h.eval(`lines(${BT}.status(),${t}).dim`), ":07");
+});
+
+test("locked: the time's seconds are drawn grey right after HH:MM, idle and walking", async h => {
+  await h.load("bangturn.app.js");
+  h.tx(`global.DRAWN=[];(function(o){g.drawString=function(s,x){DRAWN.push([""+s,x,g.getColor()]);return o.apply(g,arguments)}})(g.drawString)`);
+  const spy = () => h.tx("DRAWN=[]");
+  for (const walking of [false, true]) {
+    if (walking) h.tx(`${BT}.start(Date.now()-${5 * MIN});Bangle.emit("bangturn","start")`);
+    h.tx('Bangle.setLocked(true)');
+    spy(h);
+    h.tx('Bangle.emit("lock",true)');
+    await h.wait(100);
+    const d = h.eval("DRAWN"), fg = h.eval("g.theme.fg");
+    const i = d.findIndex((e, j) => /^:\d\d$/.test(e[0]) && /^\d\d:\d\d$/.test(d[j - 1][0])) - 1; // HH:MM is just before
+    assert(i >= 0 && /^\d\d:\d\d$/.test(d[i][0]), "HH:MM then :SS: " + JSON.stringify(d));
+    assert(d[i][2] == fg && d[i + 1][2] != fg, "seconds in another colour: " + JSON.stringify(d));
+    assert(d[i + 1][1] > d[i][1], "seconds after HH:MM");
+    h.tx('Bangle.setLocked(false)');
+    spy(h);
+    h.tx('Bangle.emit("lock",false)');
+    await h.wait(100);
+    const u = h.eval("DRAWN");
+    assert(u.some(e => /^\d\d:\d\d:\d\d$/.test(e[0]) && e[2] == fg), "unlocked: HH:MM:SS in the text colour: " + JSON.stringify(u));
+    assert(!u.some(e => e[0].indexOf(":") >= 0 && e[2] != fg), "unlocked: no grey times: " + JSON.stringify(u));
+  }
 });
 
 test("time of day ticks on its own: seconds unlocked, minutes locked, also when idle", async h => {
@@ -107,7 +134,7 @@ test("running out: countdown, time of day and start time, Out row", async h => {
   assert(!drawn.some(s => s.indexOf("Turn around") >= 0), "no turnaround line");
 });
 
-test("locked: countdown drops the seconds, minutes stay in place", async h => {
+test("locked: countdown's seconds go grey, minutes stay in place", async h => {
   h.tx(`${BT}.start(${h.eval("Date.now()") - 12 * MIN - 20000})`);
   await h.load("bangturn.app.js");
   // record [string, x, font size] for each drawString
@@ -118,9 +145,12 @@ test("locked: countdown drops the seconds, minutes stay in place", async h => {
   h.tx('AT=[];Bangle.setLocked(true);Bangle.emit("lock",true)');
   assert.eq(screenText(h).time, "47", "just the minutes");
   assert(/^Start \d\d:\d\d:\d\d$/.test(screenText(h).start), "start keeps its seconds: " + screenText(h).start);
-  const shut = h.eval("AT").find(a => a[0] == "47");
-  assert(shut, "drew 47: " + JSON.stringify(h.eval("AT")));
+  const at = h.eval("AT"), k = at.findIndex(a => a[0] == "47");
+  const shut = at[k];
+  assert(shut, "drew 47: " + JSON.stringify(at));
   assert.eq([shut[1], shut[2]], [open[1], open[2]], "same x and font as in m:ss");
+  assert(/^:[34]\d$/.test(at[k + 1][0]) && at[k + 1][1] > shut[1], "then the grey :ss after it: " + JSON.stringify(at));
+  assert.eq(h.eval(`lines(${BT}.status()).timeDim`), at[k + 1][0]);
 });
 
 test("swipe right goes back to the clock, the walk keeps running", async h => {
