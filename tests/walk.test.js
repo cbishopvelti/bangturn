@@ -189,7 +189,7 @@ test("-1 min from the menu across the turnaround: no alarm, way back rows", asyn
   spyMenu(h);
   await press(h);
   assert.eq(h.eval("screen"), "menu", "button opens the menu");
-  assert.eq(menuItems(h).map(k => k.substr(0, 6)), ["Resume", "-1 min", "Cancel", "GPS vi", "Watch "]);
+  assert.eq(menuItems(h).map(k => k.substr(0, 6)), ["Resume", "-1 min", "Cancel", "Info"]);
   pick(h, "-1 min");
   await h.wait(100);
   const st = h.eval(`${BT}.status()`);

@@ -232,7 +232,7 @@ test("idle menu returns to the idle screen after 10 s without input", async h =>
   assert(!h.eval(`${BT}.isActive()`), "no walk started");
 });
 
-test("button while running opens the menu: Resume, -1 min, Cancel walk, GPS rows", async h => {
+test("button while running opens the menu: Resume, -1 min, Cancel walk, Info", async h => {
   h.tx(`${BT}.start(${h.eval("Date.now()") - 5 * MIN})`);
   await h.load("bangturn.app.js");
   spyMenu(h);
@@ -240,7 +240,7 @@ test("button while running opens the menu: Resume, -1 min, Cancel walk, GPS rows
   press(h);
   await h.wait(100);
   assert.eq(h.eval("screen"), "menu");
-  assert.eq(menuItems(h), ["Resume", "-1 min", "Cancel walk", "GPS via", "Watch GPS"]);
+  assert.eq(menuItems(h), ["Resume", "-1 min", "Cancel walk", "Info"]);
   h.tx('MENU["Resume"]()');
   assert.eq(h.eval("screen"), "main");
   assert.eq(h.eval("MENU"), null, "menu closed");
@@ -255,11 +255,11 @@ test("-1 min shows the offset and stays in the menu", async h => {
   h.tx("showWalkMenu()");
   h.tx('MENU["-1 min"]()');
   assert.eq(h.eval("screen"), "menu");
-  assert.eq(menuItems(h), ["Resume", "-1 min (-1)", "Cancel walk", "GPS via", "Watch GPS"]);
+  assert.eq(menuItems(h), ["Resume", "-1 min (-1)", "Cancel walk", "Info"]);
   assert.eq(h.eval('MENU[""].selected'), 1, "keeps -1 min selected");
   h.tx('MENU["-1 min (-1)"]()');
   h.tx('MENU["-1 min (-2)"]()');
-  assert.eq(menuItems(h), ["Resume", "-1 min (-3)", "Cancel walk", "GPS via", "Watch GPS"]);
+  assert.eq(menuItems(h), ["Resume", "-1 min (-3)", "Cancel walk", "Info"]);
   assert.eq(h.eval(`${BT}.read().offset`), 3);
   h.tx('MENU["Resume"]()');
   const t = screenText(h);
@@ -340,26 +340,47 @@ test("turnaround alert then the countdown", async h => {
   assert.eq(screenText(h).rows.length, 2, "Out and Back rows");
 });
 
-test("the menu's GPS rows: where GPS comes from and whether the watch's chip is on", async h => {
+test("Info: where GPS comes from, whether the watch's chip is on, last fix, battery", async h => {
   h.tx(`${BT}.start(${h.eval("Date.now()") - 5 * MIN})`);
   await h.load("bangturn.app.js");
   spyMenu(h);
   h.tx("showWalkMenu()");
+  h.tx('MENU["Info"]()');
+  assert.eq(menuItems(h), ["GPS via", "Watch GPS", "Last fix", "Battery"]);
+  assert.eq(h.eval("screen"), "menu", "the menu's timeout applies");
   assert.eq(h.eval('MENU["GPS via"].value'), "none yet");
   assert.eq(h.eval('MENU["Watch GPS"].value'), "off");
+  assert.eq(h.eval('MENU["Last fix"].value'), "none");
+  assert.eq(h.eval('MENU["Battery"].value'), h.eval("E.getBattery()") + "%");
   // a fix from the phone (Gadgetbridge marks them externalSource), with the
   // chip still on (as just after an app loads); tapping a row refreshes
   h.tx('Bangle.getGPSFix=function(){return {fix:0}};Bangle.emit("GPS",{fix:1,lat:51.5,lon:-0.12,hdop:1,satellites:8,time:new Date(),externalSource:true})');
-  await h.wait(50);
+  await h.wait(1100);
   h.tx('MENU["Watch GPS"].onchange()');
   assert.eq(h.eval('MENU["GPS via"].value'), "phone");
   assert.eq(h.eval('MENU["Watch GPS"].value'), "ON");
-  assert.eq(h.eval('MENU[""].selected'), 4, "stays on the row tapped");
-  assert.eq(h.eval("screen"), "menu");
-  // the watch's own GPS
+  assert.eq(h.eval('MENU["Last fix"].value'), "1s ago");
+  assert.eq(h.eval('MENU[""].selected'), 1, "stays on the row tapped");
+  // the watch's own GPS, searching (no position: Last fix unchanged)
   h.tx('Bangle.emit("GPS",{fix:0,lat:NaN,lon:NaN,satellites:0,time:new Date()})');
   await h.wait(50);
   h.tx('MENU["GPS via"].onchange()');
   assert.eq(h.eval('MENU["GPS via"].value'), "watch");
+  assert.eq(h.eval('MENU["Last fix"].value'), "1s ago");
+  assert.eq(h.eval('MENU[""].selected'), 0);
+  // back: the walk menu, on Info
+  h.tx('MENU[""].back()');
+  assert.eq(menuItems(h), ["Resume", "-1 min", "Cancel walk", "Info"]);
   assert.eq(h.eval('MENU[""].selected'), 3);
+});
+
+test("Info closes when the walk ends", async h => {
+  h.tx(`${BT}.start(${h.eval("Date.now()") - 5 * MIN})`);
+  await h.load("bangturn.app.js");
+  spyMenu(h);
+  h.tx("showWalkMenu()");
+  h.tx('MENU["Info"]()');
+  h.tx(`${BT}.cancel()`);
+  await h.wait(100);
+  assert.eq(h.eval("screen"), "main");
 });
