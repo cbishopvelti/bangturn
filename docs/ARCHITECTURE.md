@@ -180,8 +180,10 @@ For the UI:
 
 The app's `lines()` turns `v = speed.get()` into the rows: Out and (on the
 walk back) Back, each with its average and the time to the origin at that
-speed (`v.home / speed`), and a bottom row with `v.now` and the speed needed
-(`v.home / status().remaining`). `drawRows()` draws them in columns.
+speed (`v.home / speed`), and a bottom row with the speed needed
+(`v.home / status().remaining`), `v.now` and the difference between them.
+`drawRows()` draws the first two in columns and `drawGoal()` the bottom row,
+with a target and a speedometer symbol and the difference in its colour.
 Calling `get()` every second is fine: it only reads RAM.
 
 How it tracks:

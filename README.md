@@ -8,7 +8,8 @@ quarter and an eighth of the way back is left (15, 7.5 and 3.75 minutes on
 an hour walk), and the walk ends quietly at an hour. The screen shows the
 countdown and your average speed out and back (GPS), each with the time it
 would take to get back to the start at that speed, and a bottom row with
-your speed now and the speed you need to be back as the countdown reaches 0.
+the speed you need to be back as the countdown reaches 0 (target symbol),
+your speed now (speedometer) and the difference between them.
 The way back is measured along the path you walked, with loops and detours
 cut out (see "Way home" in the spec). A widget shows the
 minutes left in other apps. Press the button during a walk for **Resume**,
@@ -134,11 +135,15 @@ before a check that needs the watch on your wrist.
     creeps up the distance. Note the battery before and after: the spec
     expects 10 to 20% for the hour.
 11. **Way home.** On the same walk, watch the times next to the speeds and
-    the bottom row. Walking steadily, Now should sit near your average and
-    not jump about by more than a few tenths (it is the last 20 s). Walk a
+    the bottom row. Walking steadily, the speed now (after the speedometer)
+    should sit near your average and not jump about by more than a few
+    tenths (it is the last 20 s). The difference at the end should be green
+    near 0.0, red with a minus when you are too slow, and readable in
+    daylight. Walk a
     small loop or a there-and-back detour on the way out: the times should
     drop back when you rejoin your path. Turn around: the times should fall
-    about a second a second, and Need should hold steady if you keep to it.
+    about a second a second, and the speed needed (after the target)
+    should hold steady if you keep to it.
     Step off the path on the way back and rejoin it further on: the times
     rise, then drop back. At the start point they should read close to
     `0:00` (within GPS accuracy, 10 to 20 m). Note if the times ever grow

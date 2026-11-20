@@ -23,7 +23,7 @@ function screenText(h) {
   L.rows = speedRows(L.rows); // "Out 5.2 kph": the whole rows are in rawRows()
   return L;
 }
-/* The rows as lines() gives them: with the times to the origin and Now/Need */
+/* The rows as lines() gives them: with the times to the origin and the bottom row */
 const rawRows = h => h.eval(`lines(${BT}.status()).rows`);
 /* "HH:MM:SS" of a watch timestamp, as the watch formats it */
 function hms(h, t) {
@@ -195,7 +195,7 @@ test("running back: Out and Back speed rows", async h => {
   assert(drawn.includes("Back") && drawn.includes("--"), JSON.stringify(drawn));
 });
 
-test("time to the origin beside each speed, and the Now and Need row", async h => {
+test("time to the origin beside each speed, and the bottom row: speed needed, speed now, difference", async h => {
   fakeSpeed(h);
   const now = h.eval("Date.now()");
   h.tx(`${BT}.start(${now - 12 * MIN})`);
@@ -205,14 +205,17 @@ test("time to the origin beside each speed, and the Now and Need row", async h =
   h.tx("global.SP={out:5,back:null,now:5.64,home:1}");
   assert.eq(rawRows(h), [
     { a: "Out", v: "5.0", tf: "12:00", t: "12:00", td: "" },
-    { a: "Now", v: "5.6", b: "Need", w: "1.3", c: 1 }], "walking out: no Back row");
+    { a: "Now", v: "5.6", w: "1.3", d: "+4.3", c: 1 }], "walking out: no Back row; 4.3 kph faster than needed");
   h.tx(`for(var i=0;i<24;i++)${BT}.minusOne()`); // 36 min in: 24 min left
   h.tx("global.SP={out:5.2,back:4.8,now:4.96,home:2}");
   const r = rawRows(h);
   assert.eq(r[0], { a: "Out", v: "5.2", tf: "23:05", t: "23:05", td: "" }, "2 km at 5.2 kph");
   assert.eq(r[1], { a: "Back", v: "4.8", tf: "25:00", t: "25:00", td: "" }, "2 km at 4.8 kph");
-  assert.eq([r[2].a, r[2].v, r[2].b], ["Now", "5.0", "Need"]);
+  assert.eq([r[2].a, r[2].v], ["Now", "5.0"]);
   assert(r[2].w == "5.0" || r[2].w == "5.1", "2 km in just under 24 min: " + r[2].w);
+  assert.eq(r[2].d, r[2].w == "5.0" ? "0.0" : "-0.1", "the difference of the two numbers as shown: no sign on 0.0, - when too slow");
+  assert.eq(h.eval("[diff(4.9,5.2),diff(5.6,5.2),diff(5.2,5.2),diff(4.96,5.04),diff(0,12.34),diff(4,150)]"),
+    ["-0.3", "+0.4", "0.0", "0.0", "-12.3", "-99+"]);
   assert.eq(r.length, 3);
 });
 
@@ -221,7 +224,7 @@ test("nothing to show yet is --, never a made-up number", async h => {
   h.tx(`${BT}.start(${h.eval("Date.now()") - 40 * MIN})`);
   await h.load("bangturn.app.js");
   h.tx("Bangle.setLocked(false)");
-  const none = { a: "Now", v: "--", b: "Need", w: "--" };
+  const none = { a: "Now", v: "--", w: "--", d: "--" };
   assert.eq(rawRows(h), [{ a: "Out", v: "--", tf: "--", t: "--", td: "" }, { a: "Back", v: "--", tf: "--", t: "--", td: "" }, none],
     "no GPS yet");
   h.tx("global.SP={out:5,back:null,now:null,home:1.5}");
@@ -229,6 +232,7 @@ test("nothing to show yet is --, never a made-up number", async h => {
   assert.eq(rawRows(h)[0].tf, "18:00");
   assert.eq(rawRows(h)[2].v, "--", "no speed now");
   assert(rawRows(h)[2].w != "--", "the speed needed only takes the way home and the countdown");
+  assert.eq(rawRows(h)[2].d, "--", "no difference without a speed now");
   h.tx("global.SP={out:5,back:0,now:0,home:1.5}");
   assert.eq(rawRows(h)[1], { a: "Back", v: "0.0", tf: "--", t: "--", td: "" }, "standing still since the turnaround: never");
   assert.eq(rawRows(h)[2].v, "0.0");
@@ -239,6 +243,7 @@ test("nothing to show yet is --, never a made-up number", async h => {
   assert.eq(rawRows(h)[1].tf, "--", "over 999 minutes");
   h.tx(`for(var i=0;i<19;i++)${BT}.minusOne()`); // under a minute left, 3 km to go
   assert.eq(rawRows(h)[2].w, "99+", "more than 100 kph needed");
+  assert.eq(rawRows(h)[2].d, "-99+");
   assert.eq(h.eval("kph(99.94)"), "99.9");
   assert.eq(h.eval("kph(99.96)"), "99+");
   assert.eq(h.eval("kph(4.96)"), "5.0"); // toFixed(1) gives 4.9 here
@@ -264,24 +269,36 @@ test("locked: times to the origin grey their seconds and stay in place; rows don
   assert.eq(at(shut, "17").slice(1), at(open, "17:30").slice(1));
   assert(at(shut, ":10") && at(shut, ":30"), "the seconds are still drawn");
   // columns: labels share an x, speeds end at the same x, rows are evenly spaced
+  // (the bottom row: speed needed, speed now 5.1, their difference, kph)
+  const g3 = rawRows(h)[2];
+  assert.eq([g3.v, g3.d[0]], ["5.1", "+"], JSON.stringify(g3));
+  // each "kph" drawn, once per place: Out's, Back's, then the bottom row's
+  const kphs = l => l.filter((a, i) => a[0] == "kph" && l.findIndex(b => "" + b == "" + a) == i);
   for (const l of [open, shut]) {
-    const y = ["Out", "Back", "Now"].map(s => at(l, s));
-    assert.eq([y[1][1], y[2][1]], [y[0][1], y[0][1]], "labels line up");
-    assert.eq(y[2][2] - y[1][2], y[1][2] - y[0][2], "evenly spaced");
-    assert.eq([at(l, "4.8")[1], at(l, "5.1")[1]], [at(l, "5.2")[1], at(l, "5.2")[1]], "speeds line up");
-    assert(y[2][2] + 9 < h.eval("Bangle.appRect.y2") - 3, "clear of the bottom of the screen");
-    assert(y[0][2] - 9 > h.eval("Bangle.appRect.y") + 82, "clear of the countdown");
+    const y = ["Out", "Back"].map(s => at(l, s));
+    assert.eq(y[1][1], y[0][1], "labels line up");
+    assert.eq(at(l, "4.8")[1], at(l, "5.2")[1], "speeds line up");
+    const ys = [at(l, "5.2")[2], at(l, "4.8")[2], at(l, "5.1")[2]];
+    assert.eq(ys[2] - ys[1], ys[1] - ys[0], "evenly spaced");
+    assert.eq([at(l, g3.w)[2], at(l, g3.d)[2]], [ys[2], ys[2]], "the bottom row's three numbers on one line");
+    assert(at(l, g3.w)[1] < at(l, "5.1")[1] && at(l, "5.1")[1] < at(l, g3.d)[1], "needed, now, difference from left to right");
+    assert.eq(at(l, g3.w)[3], at(l, g3.d)[3], "in one font size");
+    assert.eq(kphs(l).length, 3, "one kph a row");
+    assert(ys[2] + 9 < h.eval("Bangle.appRect.y2") - 3, "clear of the bottom of the screen");
+    assert(ys[0] - 9 > h.eval("Bangle.appRect.y") + 82, "clear of the countdown");
   }
-  // on the way out the Now row is already in the bottom place
+  assert(!open.some(a => a[0] == "Now" || a[0] == "Need"), "symbols, not words, in the bottom row");
+  // on the way out the bottom row is already in the bottom place
   h.tx(`${BT}.start(Date.now()-5*${MIN})`);
   h.tx('AT=[];Bangle.emit("lock",true)');
   const out = h.eval("AT");
-  assert.eq(at(out, "Now").slice(1), at(shut, "Now").slice(1), "Now doesn't move at the turnaround");
+  assert.eq(kphs(out).length, 2);
+  assert.eq(kphs(out)[1].slice(1), kphs(shut)[2].slice(1), "the bottom row doesn't move at the turnaround");
   assert.eq(at(out, "Out").slice(1), at(shut, "Out").slice(1));
   assert(!out.some(a => a[0] == "Back"), "no Back row yet");
 });
 
-test("the Now number is green on the speed needed, towards red when slower, towards the text colour when faster", async h => {
+test("the difference is green on the speed needed, towards red when slower, towards the text colour when faster", async h => {
   fakeSpeed(h);
   h.tx(`${BT}.start(${h.eval("Date.now()") - 40 * MIN})`);
   await h.load("bangturn.app.js");
@@ -304,15 +321,18 @@ test("the Now number is green on the speed needed, towards red when slower, towa
   assert.eq(h.eval("nowColour(undefined)"), fg);
   assert.eq(h.eval("nowColour(-0.5)"), h.eval("g.toColor(0.5,0.5,0)"), "halfway between green and red");
   assert.eq(h.eval("nowColour(0.5)"), h.eval("g.toColor(0,0.5,0)"), "halfway between green and black");
-  // on screen: only the Now number is coloured
+  // on screen: only the difference is coloured (it ends before the kph)
   const R = h.eval("Bangle.appRect");
   const colours = (x1, x2) => h.eval(`(function(){var c={};for(var y=${R.y2 - 22};y<=${R.y2 - 2};y++)for(var x=${x1};x<=${x2};x++){var p=g.getPixel(x,y);if(p!=g.theme.bg)c[p]=1}return Object.keys(c).map(function(k){return +k})})()`);
   h.tx("global.SP={out:5,back:5,now:3,home:1.5};tick()");
-  assert.eq(colours(R.x + 40, R.x + 76), [col("#f00")], "the number is red when far too slow");
-  assert.eq(colours(R.x, R.x + 34), [fg], "the label keeps the text colour");
-  assert.eq(colours(R.x + 78, R.x2), [fg], "kph, Need and its number keep the text colour");
+  assert.eq(rawRows(h)[2].d, "-1.5");
+  assert.eq(colours(R.x2 - 68, R.x2 - 27), [col("#f00")], "the difference is red when far too slow");
+  assert.eq(colours(R.x, R.x2 - 72), [fg], "the symbols, the speed needed and the speed now keep the text colour");
+  assert.eq(colours(R.x2 - 24, R.x2), [fg], "so does the kph");
   h.tx("global.SP={out:5,back:5,now:9,home:1.5};tick()");
-  assert.eq(colours(R.x + 40, R.x + 76), [fg], "the text colour when well ahead");
+  assert.eq(colours(R.x2 - 68, R.x2 - 27), [fg], "the text colour when well ahead");
+  // the symbols: a target at the left, a speedometer before the speed now
+  assert.eq(h.eval(`g.getPixel(${R.x + 9},${R.y2 - 11})`), fg, "the target's centre");
 });
 
 test("speed hook returning nothing still draws", async h => {

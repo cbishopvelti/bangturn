@@ -8,7 +8,8 @@
               start time, big m:ss countdown of the whole walk (just the
               minutes, in the same place, while locked), average speed
               rows, each with the time to the origin at that speed, a row
-              with the speed now and the speed needed to be back at 0
+              with the speed needed to be back at 0, the speed now and the
+              difference between them
    Swipe right goes back to the clock. The minutes-left widget is hidden.
    - menu:    (idle: Length, Info; the button goes back)
               during a walk: Resume, -1 min (offset shown), Cancel walk,
@@ -47,15 +48,24 @@ function kph(v) {
   return n >= 1000 ? "99+" : Math.floor(n / 10) + "." + (n % 10);
 }
 
-/* The colour of the Now number from lines()'s c: green on the speed needed,
-   shading to red as you fall BAND kph behind it, and to the normal text
-   colour (black on the light theme) as you get BAND ahead. The screen has
-   8 colours, so the shades in between are dithered by the firmware. */
+/* The colour of the difference between the speed now and the speed needed,
+   from lines()'s c: green on the speed needed, shading to red as you fall
+   BAND kph behind it, and to the normal text colour (black on the light
+   theme) as you get BAND ahead. The screen has 8 colours, so the shades in
+   between are dithered by the firmware. */
 var BAND = 1;
 function nowColour(c) {
   if (c === undefined) return g.theme.fg;
   if (c <= 0) return g.toColor(-c, 1 + c, 0);
   return g.theme.dark ? g.toColor(c, 1, c) : g.toColor(0, 1 - c, 0);
+}
+
+/* The speed now less the speed needed, as shown: "-0.3" when 0.3 kph too
+   slow, "+0.4" when faster than needed, "0.0" on it. From the two numbers
+   as rounded on screen, so the three always add up. */
+function diff(now, need) {
+  var n = Math.round(now * 10) - Math.round(need * 10), m = Math.abs(n);
+  return (n > 0 ? "+" : n < 0 ? "-" : "") + (m >= 1000 ? "99+" : Math.floor(m / 10) + "." + (m % 10));
 }
 
 /* Time to walk `km` at speed `v`, as m:ss like the countdown ("--" when
@@ -87,11 +97,13 @@ function hms(t, secs) {
      (speed.get().home). t is the part of it drawn in the text colour and td
      the part drawn grey: like the countdown, the seconds are grey while
      locked.
-   - {a:"Now", v, b:"Need", w, c}: the speed over the last few seconds, and
-     the speed that covers the way home in the time left on the countdown.
-     c is how Now compares with Need, for its colour (see nowColour): 0 on
-     the speed needed, down to -1 for BAND kph or more too slow, up to 1 for
-     BAND or more faster than needed; undefined when either is unknown. */
+   - {a:"Now", v, w, d, c}: v is the speed over the last few seconds, w the
+     speed needed (the one that covers the way home in the time left on the
+     countdown) and d the difference, v less w, with its sign ("-0.3" is
+     0.3 kph too slow; "--" when either is unknown). c is the same
+     comparison for d's colour (see nowColour): 0 on the speed needed, down
+     to -1 for BAND kph or more too slow, up to 1 for BAND or more faster
+     than needed; undefined when either is unknown. */
 function lines(st, now) {
   if (now === undefined) now = Date.now();
   var locked = Bangle.isLocked();
@@ -116,8 +128,11 @@ function lines(st, now) {
     row("Out", sp.out);
     if (st.phase == "back") row("Back", sp.back);
     var need = typeof sp.home == "number" && st.remaining > 0 ? sp.home * 3600000 / st.remaining : NaN;
-    var r = { a: "Now", v: kph(sp.now), b: "Need", w: kph(need) };
-    if (r.v != "--" && r.w != "--") r.c = E.clip((sp.now - need) / BAND, -1, 1);
+    var r = { a: "Now", v: kph(sp.now), w: kph(need), d: "--" };
+    if (r.v != "--" && r.w != "--") {
+      r.d = diff(sp.now, need);
+      r.c = E.clip((sp.now - need) / BAND, -1, 1);
+    }
     L.rows.push(r);
   }
   return L;
@@ -203,33 +218,50 @@ function onGPSIcon(f) {
   if (k != drawnIcon) drawIcon(k);
 }
 
+/* The bottom row: the speed needed after a target symbol, the speed now
+   after a speedometer, then the difference in its colour, with one "kph"
+   for all three at the end:
+     (o) 5.2   (/) 4.9   -0.3 kph
+   The difference always has room for a sign, so nothing moves as it
+   passes 0.0. All three shrink together when one is long (10 kph or more). */
+var GAUGE = atob("DQqBAA+BgxAEgKgMwMYMMEFAEQEA"); // 13x10, 1 bit
+function drawGoal(r, y) {
+  var R = Bangle.appRect, x1 = R.x + 3, x2 = R.x2 - 3, IW = 16, s = 22;
+  var signed = r.d[0] == "-" || r.d[0] == "+", wide = "+" + (signed ? r.d.substr(1) : r.d);
+  g.setFont("Vector", 12).setFontAlign(1, 0).drawString("kph", x2, y + 2);
+  var kw = g.stringWidth("kph") + 2, ww, tot;
+  do {
+    g.setFont("Vector", --s);
+    ww = g.stringWidth(r.w);
+    tot = 2 * IW + ww + g.stringWidth(r.v) + g.stringWidth(wide) + kw;
+  } while (s > 10 && tot > x2 - x1 - 7);
+  var x = x1 + 6, gap = (x2 - x1 + 1 - tot) / 2;
+  g.drawCircle(x, y, 6).drawCircle(x, y, 3).fillRect(x, y, x, y); // the target
+  g.setFontAlign(-1, 0).drawString(r.w, x1 + IW, y);
+  x = Math.round(x1 + IW + ww + gap);
+  g.drawImage(GAUGE, x, y - 5).drawString(r.v, x + IW, y);
+  g.setFontAlign(1, 0).setColor(nowColour(r.c)).drawString(r.d, x2 - kw, y).setColor(g.theme.fg);
+}
+
 /* The walk's rows, in columns so the numbers line up and don't move:
      Out   5.2 kph   28:45     label, average speed, time to the origin
      Back  4.9 kph   31:02     (only on the way back, always in this place)
-     Now   5.1 kph Need 4.6    always the bottom row
+     (o) 5.2  (/) 4.9  -0.3 kph   always the bottom row (see drawGoal)
    Labels and units are small, the numbers big. */
 function drawRows(rows) {
   var R = Bangle.appRect, y0 = R.y + 77 + TOP, x1 = R.x + 3, x2 = R.x2 - 3;
   var NUM = 22, LBL = 15, SX = R.x + 76; // speeds end at SX
   rows.forEach(function (r) {
-    var y = y0 + (r.b ? 2 : r.a == "Back" ? 1 : 0) * 22;
+    var y = y0 + (r.d ? 2 : r.a == "Back" ? 1 : 0) * 22;
+    if (r.d) return drawGoal(r, y);
     g.setFont("Vector", LBL).setFontAlign(-1, 0).drawString(r.a, x1, y + 1);
-    g.setFont("Vector", NUM).setFontAlign(1, 0);
-    if (r.b) g.setColor(nowColour(r.c));
-    g.drawString(r.v, SX, y).setColor(g.theme.fg);
+    g.setFont("Vector", NUM).setFontAlign(1, 0).drawString(r.v, SX, y);
     g.setFont("Vector", 12).setFontAlign(-1, 0).drawString("kph", SX + 2, y + 2);
     var kx = SX + 5 + g.stringWidth("kph"); // where the kph ends
-    if (r.b) {
-      g.setFont("Vector", 13).drawString(r.b, kx + 4, y + 1);
-      // (smaller only for a speed of 10 kph or more)
-      fit(r.w, NUM, x2 - kx - 6 - g.stringWidth(r.b));
-      g.setFontAlign(1, 0).drawString(r.w, x2, y);
-    } else {
-      // placed as the whole m:ss, so the minutes don't move when the
-      // seconds turn grey (smaller only for a time of 100 minutes or more)
-      fit(r.tf, NUM, x2 - kx - 1);
-      drawDim(r.t, r.td, x2 - g.stringWidth(r.tf), y);
-    }
+    // placed as the whole m:ss, so the minutes don't move when the
+    // seconds turn grey (smaller only for a time of 100 minutes or more)
+    fit(r.tf, NUM, x2 - kx - 1);
+    drawDim(r.t, r.td, x2 - g.stringWidth(r.tf), y);
   });
   g.setFontAlign(0, 0);
 }
