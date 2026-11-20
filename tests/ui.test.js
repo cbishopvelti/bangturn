@@ -81,7 +81,10 @@ test("time of day ticks on its own: seconds unlocked, minutes locked, also when 
   h.tx('Bangle.setLocked(true);Bangle.emit("lock",true)');
   await h.wait(300);
   const next = h.eval("clockTimer&&global['\\xff'].timers[clockTimer].time/1000");
-  assert(next > 1000 && next <= 60100, "next clock redraw on the minute: " + next);
+  // due at the next whole minute: anywhere up to 60 s away, and under 1 s
+  // when the lock lands in a minute's last second
+  const toMinute = 60000 - h.eval("Date.now()") % 60000;
+  assert(next > 0 && next <= 60100 && (Math.abs(next - toMinute) % 60000 < 400 || Math.abs(next - toMinute) > 59600), "next clock redraw on the minute: " + next + ", minute in " + toMinute);
   h.tx("showWalkMenu()");
   assert.eq(h.eval("clockTimer===undefined"), true, "no clock timer in the menu");
 });

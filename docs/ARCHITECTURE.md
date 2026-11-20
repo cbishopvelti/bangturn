@@ -64,6 +64,7 @@ Constants: `DURATION` (3600000, the only place the walk length lives),
 | `minusOne()` | Moves the start 1 minute earlier and reschedules, skipping past events. Past the turnaround: no alarm, `turned` set, phase becomes `"back"`. Past the end: the walk finishes. Returns the new `status()`. |
 | `cancel()` | Clears all BangTurn `sched` entries and the state |
 | `finish()` | Ends the walk silently (used at the end, and by `minusOne`) |
+| `catchUp(now?)` | Boot code calls it during a walk. `sched` only fires entries dated today, so entries missed while the watch was off across midnight (dated yesterday) are moved to now, a second apart in walk order, and `fire()` handles them as late |
 | `takeAlert()` | Returns the pending alert (`"turn"`) and clears it, or `undefined` |
 | `fire(id)` | Called by `sched`; see below. Not for other parts to call. |
 | `schedule()`, `clearSched()`, `getSched()` | Rewrite, clear and list our `sched` entries (used internally and by tests) |

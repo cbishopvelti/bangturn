@@ -15,6 +15,9 @@
     // The watch was off (or sched missed the end): a walk whose hour is
     // up ends now, silently, rather than showing 0:00:00 for ever.
     if (bt.status(undefined, s).remaining <= 0) bt.finish();
-    else require("bangturn.speed").resume(s);
+    else {
+      bt.catchUp(); // entries missed across midnight while the watch was off
+      require("bangturn.speed").resume(s);
+    }
   }
 })();

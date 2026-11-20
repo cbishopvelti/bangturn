@@ -163,6 +163,24 @@ exports.schedule = function (now, s) {
   writeSched(list);
 };
 
+/* After a boot: sched only fires entries dated today, so an entry missed
+   while the watch was off that is dated yesterday (the watch was off across
+   midnight) would never fire, and a missed turnaround would be lost. Such
+   entries are moved to now, so sched fires them in a second; fire() then
+   handles them as late (the turnaround still shows, a late buzz is
+   skipped). Called by the boot code during a walk. */
+exports.catchUp = function (now) {
+  if (now === undefined) now = Date.now();
+  var today = new Date(now).toLocalISOString().substr(0, 10), moved = 0;
+  // in walk order, a second apart, so a missed turnaround fires first (and
+  // its reschedule then drops the missed buzzes after it)
+  var list = exports.getSched().map(function (a) {
+    if (!a.date || a.date >= today) return a;
+    return entry(a.id.substr(APPID.length + 1), now + 1000 * moved++);
+  });
+  if (moved) writeSched(list);
+};
+
 /* ---------- actions ---------- */
 
 /* Start a walk now (or at time `at`, for tests). Returns the new state.
