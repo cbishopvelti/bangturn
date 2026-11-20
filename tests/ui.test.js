@@ -447,11 +447,12 @@ test("walk screen: GPS symbol shows phone or watch, and follows GPS events", asy
   h.tx('Bangle.emit("GPS",{fix:1,lat:51.5,lon:-0.12,hdop:1,satellites:8,time:new Date(),externalSource:true})');
   await h.wait(100);
   assert.eq(h.eval("drawnIcon"), "phone");
+  const R = h.eval("Bangle.appRect");
+  assert.eq(h.eval(`g.getPixel(${R.x + 8},${R.y + 7})`), h.eval('g.toColor("#0f0")'), "green location pin on the phone");
   // the watch's chip on (its events come every second): watch, in red
   h.tx('Bangle.getGPSFix=function(){return {fix:0}};Bangle.emit("GPS",{fix:0,lat:NaN,lon:NaN,satellites:0,time:new Date()})');
   await h.wait(100);
   assert.eq(h.eval("drawnIcon"), "watch");
-  const R = h.eval("Bangle.appRect");
   assert.eq(h.eval(`g.getPixel(${R.x + 8},${R.y + 12})`), h.eval('g.toColor("#f00")'), "red crosshair centre, left of the time");
   // the symbol survives a full redraw
   h.tx("tick()");

@@ -98,7 +98,8 @@ function drawClock(L) {
 /* The GPS symbol left of the time of day (top row) during a walk: where the
    speeds' GPS comes from, from the same facts as Info.
    "watch": the watch's own GPS chip is on (red: the big battery drain);
-   "phone": the phone's fixes are arriving and the chip is off;
+   "phone": the phone's fixes are arriving and the chip is off (green phone
+     with a location pin);
    "": no GPS yet. Redrawn on its own when it changes (see onGPSIcon). */
 var ICON_W = 16;
 var drawnIcon; // the symbol on screen now
@@ -110,10 +111,14 @@ function drawIcon(k) {
   drawnIcon = k;
   var R = Bangle.appRect, cx = R.x + ICON_W / 2, cy = R.y + 12;
   g.reset().clearRect(R.x, cy - 10, R.x + ICON_W, cy + 10);
-  if (k == "phone") { // a phone: rounded body, screen, button
-    g.drawRect({ x: cx - 5, y: cy - 9, w: 11, h: 19, r: 2 })
-      .drawRect(cx - 3, cy - 6, cx + 3, cy + 4)
-      .fillRect(cx - 1, cy + 6, cx + 1, cy + 7);
+  if (k == "phone") { // a phone giving its location: a pin on its screen, in green
+    g.setColor("#0f0") // pure green: the 3-bit screen dithers darker greens
+      .drawRect({ x: cx - 6, y: cy - 10, w: 13, h: 21, r: 2 })
+      .drawRect({ x: cx - 5, y: cy - 9, w: 11, h: 19, r: 2 })
+      .fillRect(cx - 1, cy + 7, cx + 1, cy + 7) // the button
+      .fillCircle(cx, cy - 3, 3) // the pin's head...
+      .fillPoly([cx - 3, cy - 2, cx + 3, cy - 2, cx, cy + 4]) // ...and point
+      .setColor(g.theme.bg).fillRect(cx, cy - 3, cx, cy - 3); // its hole
   } else if (k == "watch") { // a GPS crosshair, in red
     g.setColor(g.theme.dark ? "#f44" : "#f00")
       .drawCircle(cx, cy, 5).drawCircle(cx, cy, 4).fillCircle(cx, cy, 1)
