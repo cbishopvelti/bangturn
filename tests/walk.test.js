@@ -39,7 +39,7 @@ const gpsFile = h => h.eval('require("Storage").readJSON("bangturn.gps.json",1)|
 // app.js: what the main screen shows, minus the time of day and start time
 const screen = h => {
   const L = h.eval(`lines(${BT}.status())`);
-  delete L.now; delete L.nowFull;
+  delete L.now; delete L.nowFull; delete L.dim; delete L.timeDim;
   delete L.start;
   delete L.full;
   return L;
