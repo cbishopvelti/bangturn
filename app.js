@@ -4,11 +4,11 @@
               no swipe for the length (another app on the watch uses swipes).
               The button never starts a walk (it's pressed just to get
               around): it opens the idle menu (Length, the picker); a tap starts
-   - running: small row with the time of day and the walk's start time,
-              big m:ss countdown of the whole walk (just the minutes,
-              in the same place, while locked), average speed rows, each
-              with the time to the origin at that speed, a row with the
-              speed now and the speed needed to be back at 0, progress bar
+   - running: two lines at the top with the time of day and the walk's
+              start time, big m:ss countdown of the whole walk (just the
+              minutes, in the same place, while locked), average speed
+              rows, each with the time to the origin at that speed, a row
+              with the speed now and the speed needed to be back at 0
    Swipe right goes back to the clock. The minutes-left widget is hidden.
    - menu:    (idle: Length, Info; the button goes back)
               during a walk: Resume, -1 min (offset shown), Cancel walk,
@@ -47,6 +47,17 @@ function kph(v) {
   return n >= 1000 ? "99+" : Math.floor(n / 10) + "." + (n % 10);
 }
 
+/* The colour of the Now number from lines()'s c: green on the speed needed,
+   shading to red as you fall BAND kph behind it, and to the normal text
+   colour (black on the light theme) as you get BAND ahead. The screen has
+   8 colours, so the shades in between are dithered by the firmware. */
+var BAND = 1;
+function nowColour(c) {
+  if (c === undefined) return g.theme.fg;
+  if (c <= 0) return g.toColor(-c, 1 + c, 0);
+  return g.theme.dark ? g.toColor(c, 1, c) : g.toColor(0, 1 - c, 0);
+}
+
 /* Time to walk `km` at speed `v`, as m:ss like the countdown ("--" when
    there is no distance or speed yet, the speed is 0, or it's over 999 min) */
 function tto(km, v) {
@@ -72,8 +83,11 @@ function hms(t, secs) {
      to the origin at that speed along the trail home (speed.get().home).
      t is what is drawn of it: like the countdown, just the minutes while
      locked.
-   - {a:"Now", v, b:"Need", w}: the speed over the last few seconds, and the
-     speed that covers the way home in the time left on the countdown. */
+   - {a:"Now", v, b:"Need", w, c}: the speed over the last few seconds, and
+     the speed that covers the way home in the time left on the countdown.
+     c is how Now compares with Need, for its colour (see nowColour): 0 on
+     the speed needed, down to -1 for BAND kph or more too slow, up to 1 for
+     BAND or more faster than needed; undefined when either is unknown. */
 function lines(st, now) {
   if (now === undefined) now = Date.now();
   var locked = Bangle.isLocked();
@@ -93,26 +107,34 @@ function lines(st, now) {
     };
     row("Out", sp.out);
     if (st.phase == "back") row("Back", sp.back);
-    L.rows.push({ a: "Now", v: kph(sp.now), b: "Need",
-      w: kph(typeof sp.home == "number" && st.remaining > 0 ? sp.home * 3600000 / st.remaining : NaN) });
+    var need = typeof sp.home == "number" && st.remaining > 0 ? sp.home * 3600000 / st.remaining : NaN;
+    var r = { a: "Now", v: kph(sp.now), b: "Need", w: kph(need) };
+    if (r.v != "--" && r.w != "--") r.c = E.clip((sp.now - need) / BAND, -1, 1);
+    L.rows.push(r);
   }
   return L;
 }
 
-/* The small row above the countdown: time of day, plus the start time
-   on the right during a walk */
+/* Above the countdown: the time of day. During a walk, two lines with
+   the times one above the other at the right:
+     [GPS symbol]   19:31:38
+     Start          18:50:28 */
+var TOP = 16; // how much lower the walk screen's countdown and rows are for the second line
 function drawClock(L) {
   var R = Bangle.appRect, y = R.y + 12;
-  g.reset().clearRect(R.x, y - 11, R.x2, y + 11);
+  g.reset();
   if (L.start) {
-    // during a walk the GPS symbol sits left of the time, which always
-    // starts just after it, so the time never moves
-    var hw = R.w / 2 - 4;
-    g.setFont("Vector", Math.min(fit(L.nowFull, 18, hw - ICON_W - 2), fit(L.start, 18, hw)));
-    g.setFontAlign(-1, 0).drawString(L.now, R.x + ICON_W + 4, y);
-    g.setFontAlign(1, 0).drawString(L.start, R.x2 - 3, y);
+    g.clearRect(R.x, R.y, R.x2, R.y + 39);
+    // sized and placed as the full HH:MM:SS, so HH:MM stays put when the
+    // seconds are left off while locked; the GPS symbol sits at the left
+    // and doesn't move it either
+    g.setFont("Vector", 20).setFontAlign(-1, 0);
+    g.drawString(L.now, R.x2 - 3 - g.stringWidth(L.nowFull), y - 1);
+    g.setFontAlign(1, 0).drawString(L.start.substr(6), R.x2 - 3, y + 18);
+    g.setFont("Vector", 15).setFontAlign(-1, 0).drawString("Start", R.x + 3, y + 19);
     drawIcon(gpsIcon());
   } else {
+    g.clearRect(R.x, y - 11, R.x2, y + 11);
     // sized and placed as the full HH:MM:SS, so HH:MM stays put when the
     // seconds are left off while locked
     fit(L.nowFull, 20, R.w - 4);
@@ -168,26 +190,28 @@ function onGPSIcon(f) {
 /* The walk's rows, in columns so the numbers line up and don't move:
      Out   5.2 kph   28:45     label, average speed, time to the origin
      Back  4.9 kph   31:02     (only on the way back, always in this place)
-     Now   5.1   Need  4.6     always the bottom row
+     Now   5.1 kph Need 4.6    always the bottom row
    Labels and units are small, the numbers big. */
 function drawRows(rows) {
-  var R = Bangle.appRect, y0 = R.y + 77, x1 = R.x + 3, x2 = R.x2 - 3;
-  var NUM = 22, LBL = 15, SX = R.x + 79; // speeds end at SX
+  var R = Bangle.appRect, y0 = R.y + 77 + TOP, x1 = R.x + 3, x2 = R.x2 - 3;
+  var NUM = 22, LBL = 15, SX = R.x + 76; // speeds end at SX
   rows.forEach(function (r) {
     var y = y0 + (r.b ? 2 : r.a == "Back" ? 1 : 0) * 22;
     g.setFont("Vector", LBL).setFontAlign(-1, 0).drawString(r.a, x1, y + 1);
-    g.setFont("Vector", NUM).setFontAlign(1, 0).drawString(r.v, SX, y);
+    g.setFont("Vector", NUM).setFontAlign(1, 0);
+    if (r.b) g.setColor(nowColour(r.c));
+    g.drawString(r.v, SX, y).setColor(g.theme.fg);
+    g.setFont("Vector", 12).setFontAlign(-1, 0).drawString("kph", SX + 2, y + 2);
+    var kx = SX + 5 + g.stringWidth("kph"); // where the kph ends
     if (r.b) {
-      g.setFont("Vector", LBL).setFontAlign(-1, 0).drawString(r.b, SX + 10, y + 1);
+      g.setFont("Vector", 13).drawString(r.b, kx + 4, y + 1);
       // (smaller only for a speed of 10 kph or more)
-      fit(r.w, NUM, x2 - SX - 13 - g.stringWidth(r.b));
+      fit(r.w, NUM, x2 - kx - 6 - g.stringWidth(r.b));
       g.setFontAlign(1, 0).drawString(r.w, x2, y);
     } else {
-      g.setFont("Vector", 12).setFontAlign(-1, 0).drawString("kph", SX + 2, y + 2);
       // placed as the whole m:ss, so the minutes don't move while locked
       // (smaller only for a time of 100 minutes or more)
-      var kx = SX + 6 + g.stringWidth("kph");
-      fit(r.tf, NUM, x2 - kx);
+      fit(r.tf, NUM, x2 - kx - 1);
       g.drawString(r.t, x2 - g.stringWidth(r.tf), y);
     }
   });
@@ -202,9 +226,10 @@ function draw(st) {
   g.reset().clearRect(R).setFontAlign(0, 0);
   drawnIcon = undefined; // drawn again with the time row during a walk
   // sized and placed as the full m:ss, so the minutes don't move when the
-  // seconds are left off
+  // seconds are left off (a line lower during a walk: the start time is
+  // above it)
   fit(L.full, 46, w);
-  g.setFontAlign(-1, 0).drawString(L.time, x - g.stringWidth(L.full) / 2, y + 48);
+  g.setFontAlign(-1, 0).drawString(L.time, x - g.stringWidth(L.full) / 2, y + 48 + (st.active ? TOP : 0));
   g.setFontAlign(0, 0);
   drawClock(L);
   if (!st.active) {
@@ -215,15 +240,6 @@ function draw(st) {
     return st;
   }
   drawRows(L.rows);
-  // progress bar of the whole walk, with a notch at the turnaround
-  var bx = R.x + 6, bw = R.w - 12, by = R.y2 - 16, bh = 12;
-  g.drawRect(bx, by, bx + bw - 1, by + bh - 1);
-  var fill = Math.round((bw - 4) * Math.min(1, st.elapsed / st.duration));
-  if (fill > 0) g.fillRect(bx + 2, by + 2, bx + 1 + fill, by + bh - 3);
-  var tx = bx + Math.round(bw * st.turn / st.duration);
-  g.setColor(st.elapsed >= st.turn ? g.theme.bg : g.theme.fg)
-    .drawLine(tx, by - 3, tx, by + bh + 2);
-  g.setColor(g.theme.fg).drawLine(tx, by - 3, tx, by - 1).drawLine(tx, by + bh, tx, by + bh + 2);
   return st;
 }
 
