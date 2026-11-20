@@ -212,23 +212,22 @@ test("-1 min from the menu across the turnaround: no alarm, way back rows", asyn
   assert.eq(buzzes(h), [200], "15 min left buzz");
 });
 
-test("button on the idle screen opens the menu, a second press goes back, no walk", async h => {
+test("button on the idle screen opens the menu, a second press goes back, no walk; a tap starts", async h => {
   await record(h);
   await h.load("bangturn.app.js");
   h.tx("Bangle.setLocked(false)");
   spyMenu(h);
   await press(h);
   assert.eq(h.eval("screen"), "menu", "button opens the idle menu");
-  assert.eq(menuItems(h), ["Start walk", "Length: 60 min"]);
+  assert.eq(menuItems(h), ["Length: 60 min"]);
   await press(h);
   await h.wait(100);
   assert.eq(h.eval("screen"), "main", "button goes back to the idle screen");
   assert.eq(state(h), {}, "no walk started");
   assert.eq(buzzes(h), [], "no start buzz");
-  await press(h);
-  pick(h, "Start walk");
-  await h.wait(200);
-  assert(h.eval(`${BT}.isActive()`), "Start walk starts it");
+  h.tx('Bangle.emit("touch",1,{x:88,y:100,type:0})');
+  await h.wait(300);
+  assert(h.eval(`${BT}.isActive()`), "a tap starts it");
   assert.eq(buzzes(h), [100], "start buzz");
 });
 

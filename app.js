@@ -3,13 +3,13 @@
    - idle:    60:00 (the walk length), time of day, "Tap to start";
               swipe left opens the walk length picker (bangturn.picker).
               The button never starts a walk (it's pressed just to get
-              around): it opens the idle menu (Start walk, Length)
+              around): it opens the idle menu (Length); a tap starts
    - running: small row with the time of day and the walk's start time,
               big m:ss countdown of the whole walk (just the minutes,
               in the same place, while locked), average speed rows,
               progress bar
    Swipe right goes back to the clock. The minutes-left widget is hidden.
-   - menu:    (idle: Start walk, Length; the button goes back)
+   - menu:    (idle: Length; the button goes back)
               during a walk: Resume, -1 min (offset shown), Cancel walk, then GPS via
               (phone/watch) and Watch GPS (the chip on/off); back to the
               countdown after 10 s with no input
@@ -172,8 +172,8 @@ function showMain() {
   Bangle.drawWidgets();
   Bangle.setUI({
     mode: "custom",
-    // the button never starts a walk: it opens a menu (Start walk is in
-    // the idle one), and in the menu it comes back here
+    // the button never starts a walk (a tap does): it opens a menu, and
+    // in the menu it comes back here
     btn: function () { if (bt.isActive()) showWalkMenu(); else showIdleMenu(); },
     touch: function () { if (!bt.isActive()) start(); },
     // swipe right: back to the clock (the walk keeps running);
@@ -203,13 +203,12 @@ function start() {
   tick();
 }
 
-/* Before a walk: start it, or set the length. Back (or the button) returns
+/* Before a walk: set the length (a tap on the idle screen starts it). Back (or the button) returns
    to the idle screen without starting anything. */
 function showIdleMenu() {
   stopTimers();
   screen = "menu";
   var menu = { "": { title: "BangTurn", back: showMain } };
-  menu["Start walk"] = function () { stopMenuTimer(); showMain(); start(); };
   menu["Length: " + bt.getMins() + " min"] = function () { stopMenuTimer(); showPicker(); };
   E.showMenu(menu);
   startMenuTimer();
