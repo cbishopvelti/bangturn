@@ -56,11 +56,11 @@ Walk length: `getMins()` / `setMins(m)` read and save the setting
 `"settings"`). `start()` copies it into the walk as `dur` (minutes), so a
 change only affects the next walk. `duration(s)` is the walk's length in ms
 (the setting's when idle; 60 min for a walk saved without `dur`), and
-`events(dur)` its `[id, ms after start]` pairs: the countdown buzzes only
-when they come after the turnaround. Use `status().duration` and
+`events(dur)` its `[id, ms after start]` pairs: the countdown buzzes at
+1/2, 1/4 and 1/8 of the way back left. Use `status().duration` and
 `status().turn`, not the constants, which are only the default hour:
 `DURATION` (3600000), `TURN`, `EVENTS` (the hour's), `BUZZES`
-(`{left15:1, left8:2, left4:3, left1:4}`).
+(`{back2:1, back4:2, back8:3}`).
 
 | Function | Does |
 |---|---|
@@ -69,7 +69,7 @@ when they come after the turnaround. Use `status().duration` and
 | `mins(ms)` / `untilMins(ms)` | The minutes of `fmt(ms)` (`47` for `47:30`, rounded down), used by the widget and the locked app; and ms until they change |
 | `isActive()` | A walk is running |
 | `read()` | The raw state object |
-| `start()` | Starts a walk now, writes the six `sched` entries. Doesn't buzz: the app calls `alerts.started()`. |
+| `start()` | Starts a walk now, writes the five `sched` entries. Doesn't buzz: the app calls `alerts.started()`. |
 | `minusOne()` | Moves the start 1 minute earlier and reschedules, skipping past events. Past the turnaround: no alarm, `turned` set, phase becomes `"back"`. Past the end: the walk finishes. Returns the new `status()`. |
 | `cancel()` | Clears all BangTurn `sched` entries and the state |
 | `finish()` | Ends the walk silently (used at the end, and by `minusOne`) |
@@ -102,15 +102,14 @@ Listen with `Bangle.on("bangturn", function(type) {...})`. On `"end"` and
 On start (and after every `-1 min`) the core writes one plain `sched` alarm
 per future event, at an absolute local time and date:
 
-Times below are for the default hour; for other lengths they are half the walk and 15/8/4/1 min before the end.
+Times below are for the default hour; for other lengths they are half the walk, then 1/2, 1/4 and 1/8 of the way back before the end.
 
 | id | When (after the effective start) | `fire()` does |
 |---|---|---|
 | `bangturn.turn` | 30 min | Sets `turned` and `alert:"turn"`, emits `"turn"`, then `load("bangturn.app.js")` |
-| `bangturn.left15` | 45 min | Emits `"buzz"`, calls `alerts.countdown(1)` in whatever app is open |
-| `bangturn.left8` | 52 min | `alerts.countdown(2)` |
-| `bangturn.left4` | 56 min | `alerts.countdown(3)` |
-| `bangturn.left1` | 59 min | `alerts.countdown(4)` |
+| `bangturn.back2` | 45 min (15 min left) | Emits `"buzz"`, calls `alerts.countdown(1)` in whatever app is open |
+| `bangturn.back4` | 52.5 min (7.5 min left) | `alerts.countdown(2)` |
+| `bangturn.back8` | 56.25 min (3.75 min left) | `alerts.countdown(3)` |
 | `bangturn.end` | 60 min | `finish()`: clears everything, emits `"end"`, no buzz |
 
 Entries have `appid:"bangturn"`, `hidden:true` (not shown in the Alarms

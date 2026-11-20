@@ -4,8 +4,8 @@ const { test, assert } = require("./harness");
 
 const MIN = 60000, DUR = 60 * MIN, TURN = 30 * MIN;
 const BT = 'require("bangturn")';
-const ALL = ["turn", "left15", "left8", "left4", "left1", "end"];
-const AT = { turn: 30, left15: 45, left8: 52, left4: 56, left1: 59, end: 60 };
+const ALL = ["turn", "back2", "back4", "back8", "end"];
+const AT = { turn: 30, back2: 45, back4: 52.5, back8: 56.25, end: 60 };
 
 /* our sched entries as {id: absolute fire time} (emulator runs in UTC) */
 function entries(h) {
@@ -64,7 +64,7 @@ test("idle status and h:mm:ss formatting", async h => {
   assert.eq(h.eval(`${BT}.getSched()`), []);
 });
 
-test("start writes state and six sched entries", async h => {
+test("start writes state and five sched entries", async h => {
   listen(h);
   const now = h.eval("Date.now()");
   h.tx(`${BT}.start(${now})`);
@@ -90,7 +90,7 @@ test("start in the past skips past events", async h => {
   const now = h.eval("Date.now()");
   const start = now - 53 * MIN;
   h.tx(`${BT}.start(${start})`);
-  expectEntries(h, start, ["left4", "left1", "end"]);
+  expectEntries(h, start, ["back8", "end"]);
 });
 
 test("entries crossing midnight get tomorrow's date", async h => {
@@ -111,14 +111,14 @@ test("a turnaround missed across midnight while the watch was off still shows", 
   const start = now - 46 * MIN;
   h.tx(`(function(){var bt=${BT},s={start:${start},offset:0,turned:false};bt.write(s);bt.schedule(${start},s);` +
        `var y=new Date(${now}-86400000).toLocalISOString().substr(0,10);` +
-       `var al=require("sched").getAlarms().map(function(a){if(a.id=="bangturn.turn"||a.id=="bangturn.left15")a.date=y;return a});` +
+       `var al=require("sched").getAlarms().map(function(a){if(a.id=="bangturn.turn"||a.id=="bangturn.back2")a.date=y;return a});` +
        `require("sched").setAlarms(al)})()`);
   await h.load(); // boot
   let file;
   for (let i = 0; i < 40 && (file = h.eval("global.__FILE__")) != "bangturn.app.js"; i++) await h.wait(100);
   assert.eq(file, "bangturn.app.js", "late turnaround opened the app");
   assert.eq(h.eval(`${BT}.read().turned`), true);
-  expectEntries(h, start, ["left8", "left4", "left1", "end"]);
+  expectEntries(h, start, ["back4", "back8", "end"]);
 });
 
 test("catch-up leaves entries dated today or later alone", async h => {
@@ -158,7 +158,7 @@ test("-1 min past the turnaround skips the alarm and shows heading home", async 
   const st = h.eval(`${BT}.minusOne(${now})`);
   assert.eq([st.phase, st.turned], ["back", true]);
   assert.eq(h.eval(`${BT}.read().turned`), true);
-  expectEntries(h, start - MIN, ["left15", "left8", "left4", "left1", "end"]);
+  expectEntries(h, start - MIN, ["back2", "back4", "back8", "end"]);
   assert.eq(h.eval("EV"), ["start", "offset"]);
 });
 
@@ -167,7 +167,7 @@ test("-1 min past a countdown buzz skips that buzz", async h => {
   const start = now - 44.5 * MIN;
   h.tx(`${BT}.start(${start})`);
   h.tx(`${BT}.minusOne(${now})`);
-  expectEntries(h, start - MIN, ["left8", "left4", "left1", "end"]);
+  expectEntries(h, start - MIN, ["back4", "back8", "end"]);
 });
 
 test("-1 min past the end finishes the walk", async h => {
@@ -202,18 +202,18 @@ test("cancel clears state, entries and GPS", async h => {
   assert(!n || n.js.indexOf("bangturn") < 0, "sched not armed for BangTurn");
 });
 
-test("fire(left8): removes that entry and buzzes twice in place", async h => {
+test("fire(back4): removes that entry and buzzes twice in place", async h => {
   const now = h.eval("Date.now()");
-  const start = now - 52 * MIN;
+  const start = now - 52.5 * MIN;
   h.tx(`${BT}.start(${start})`);
-  // pretend sched still had the left8 entry
+  // pretend sched still had the back4 entry
   listen(h);
   h.tx(`global.BUZZ=[];Bangle.buzz=function(ms){BUZZ.push(ms);return Promise.resolve()}`);
-  h.tx(`${BT}.fire("left8")`);
+  h.tx(`${BT}.fire("back4")`);
   await h.wait(1500);
   assert.eq(h.eval("BUZZ"), [200, 200], "two short buzzes");
   assert.eq(h.eval("EV"), ["buzz"]);
-  expectEntries(h, start, ["left4", "left1", "end"]);
+  expectEntries(h, start, ["back8", "end"]);
 });
 
 test("fire(turn): marks turned, flags the alert and loads the app", async h => {
@@ -227,7 +227,7 @@ test("fire(turn): marks turned, flags the alert and loads the app", async h => {
   assert.eq(h.eval("EV"), ["turn"]);
   const s = h.eval(`${BT}.read()`);
   assert.eq([s.turned, s.alert], [true, "turn"]);
-  expectEntries(h, start, ["left15", "left8", "left4", "left1", "end"]);
+  expectEntries(h, start, ["back2", "back4", "back8", "end"]);
   assert.eq(h.eval(`${BT}.takeAlert()`), "turn");
   assert.eq(h.eval(`${BT}.takeAlert()===undefined`), true);
   assert.eq(h.eval(`${BT}.read().alert===undefined`), true);
@@ -284,8 +284,8 @@ test("sched fires the turnaround: app loads and shows the alert", async h => {
   assert.eq(h.eval("global.__FILE__"), "bangturn.app.js", "app loaded");
   const s = h.eval(`${BT}.read()`);
   assert.eq([s.turned, s.alert], [true, undefined], "turned, alert taken by the app");
-  expectEntries(h, now - TURN + 1500, ["left15", "left8", "left4", "left1", "end"]);
-  expectNext(h, "left15", now - TURN + 1500 + 45 * MIN, "next is the 15 min buzz");
+  expectEntries(h, now - TURN + 1500, ["back2", "back4", "back8", "end"]);
+  expectNext(h, "back2", now - TURN + 1500 + 45 * MIN, "next is the half-way-back buzz");
 });
 
 test("sched fires a countdown buzz without leaving the current app", async h => {
@@ -296,7 +296,7 @@ test("sched fires a countdown buzz without leaving the current app", async h => 
   await h.wait(3500);
   assert.eq(h.eval("BUZZ"), [200], "one buzz at 15 min left");
   assert(h.eval(`global.__FILE__!="bangturn.app.js"`), "still on the clock");
-  expectNext(h, "left8", now - 45 * MIN + 1500 + 52 * MIN, "next is the 8 min buzz");
+  expectNext(h, "back4", now - 45 * MIN + 1500 + 52.5 * MIN, "next is the quarter buzz");
 });
 
 test("sched fires the end: walk finishes and GPS turns off", async h => {
@@ -317,6 +317,6 @@ test("app starts a walk from the idle screen", async h => {
   await h.wait(100);
   assert(h.eval(`${BT}.isActive()`), "walk started");
   assert.eq(h.eval("BUZZ"), [100], "start confirmation buzz");
-  assert.eq(Object.keys(entries(h)).length, 6);
+  assert.eq(Object.keys(entries(h)).length, 5);
 });
 

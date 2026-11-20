@@ -13,7 +13,7 @@ Tell you when to turn around on an out-and-back walk. Start it when you set off 
 3. You can leave the app and go back to the clock. The timer keeps running in the background.
 4. When the countdown reaches 30 minutes left, the watch vibrates with a distinct pattern and shows **TURN AROUND**.
 5. The alarm stops as soon as the watch unlocks (you raise your wrist to look, press the button or tap), or after 6 seconds, whichever comes first.
-6. The countdown carries on for the walk back, with short countdown buzzes at 15, 8, 4 and 1 minutes left. At zero the walk ends silently (no buzz): GPS turns off and the app returns to the idle screen.
+6. The countdown carries on for the walk back, with short countdown buzzes at half, a quarter and an eighth of the way back left (15, 7.5 and 3.75 minutes on an hour walk). At zero the walk ends silently (no buzz): GPS turns off and the app returns to the idle screen.
 
 ## Duration
 
@@ -48,10 +48,10 @@ Tell you when to turn around on an out-and-back walk. Start it when you set off 
 
 - Start confirmation: one short buzz (~100 ms).
 - Home-stretch countdown (walk back only), short buzzes (~200 ms on, 300 ms off) so you can count them without looking:
-  - 15 min left: 1 buzz
-  - 8 min left: 2 buzzes
-  - 4 min left: 3 buzzes
-  - 1 min left: 4 buzzes
+  - Half the way back left (15 min on an hour walk): 1 buzz
+  - A quarter left (7.5 min): 2 buzzes
+  - An eighth left (3.75 min): 3 buzzes
+  - These scale with the walk length (Chris, 2026-11-20), so every walk gets all three.
 - Walk done (countdown hits zero): **no buzz**.
 - Countdown buzzes also play in Quiet Mode.
 - Turnaround alarm: distinct and prominent. A continuous pattern of long full-strength buzzes (e.g. 600 ms on, 200 ms off), unlike any notification buzz, with the screen lit.
@@ -62,7 +62,7 @@ Tell you when to turn around on an out-and-back walk. Start it when you set off 
 ## Background behaviour
 
 - Use the built-in **`sched`** library (the same one the Alarm and Timer apps use) rather than an in-app `setTimeout`. That way the timer survives leaving the app, opening other apps, or the watch going back to the clock.
-- On start, BangTurn writes six timer entries to `sched` (turnaround at 30 min; countdown buzzes at 45, 52, 56 and 59 min; silent walk end at 60 min, which turns GPS off), each with `js` pointing back to BangTurn, so the alert opens BangTurn wherever you are. The start time is saved in `bangturn.json` so the countdown can be redrawn after leaving and reopening the app.
+- On start, BangTurn writes five timer entries to `sched` (turnaround at 30 min; countdown buzzes at 45, 52.5 and 56.25 min, scaled to the walk length; silent walk end at 60 min, which turns GPS off), each with `js` pointing back to BangTurn, so the alert opens BangTurn wherever you are. The start time is saved in `bangturn.json` so the countdown can be redrawn after leaving and reopening the app.
 - Requires the **Scheduler** (`sched`) app as a dependency in `metadata.json`.
 - If the watch reboots mid-walk, `sched` restores the timer.
 
@@ -92,6 +92,6 @@ Tell you when to turn around on an out-and-back walk. Start it when you set off 
 - 1-hour walk by default, adjustable with hours/minutes scroll wheels (Chris, 2026-11-20); turnaround at half; countdown shows the whole walk in minutes (no hours).
 - Prominent turnaround alarm; buzzes in Quiet Mode; stops on a button press, a tap or after 6 s.
 - No warning buzz before the turnaround.
-- Home-stretch countdown buzzes at 15/8/4/1 min left (1/2/3/4 buzzes).
+- Home-stretch countdown buzzes at 1/2, 1/4 and 1/8 of the way back left (1/2/3 buzzes).
 - **−1 min** in the menu moves the walk's start time one minute earlier per tap (for when you forgot to press start straight away). The countdown drops by a minute and all `sched` timers are rescheduled. Any buzz whose time has already passed is skipped: if this moves the turnaround into the past, no alarm fires and the screen switches to the way back (Back speed row); if it moves the end into the past, the walk finishes.
 - Cancel via short button press, then Cancel walk in the menu. If the watch is locked, the first press may only wake the screen; a second press opens the menu.

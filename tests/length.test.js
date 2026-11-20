@@ -34,26 +34,30 @@ test("the length setting: an hour by default, saved, kept in range", async h => 
   assert.eq(h.eval(`${BT}.setMins(5000)`), 599, "at most 9 h 59");
 });
 
-test("a 90 minute walk: turnaround at 45, buzzes at 15/8/4/1 left, end at 90", async h => {
+test("a 90 minute walk: turnaround at 45, buzzes at 1/2, 1/4, 1/8 of the way back, end at 90", async h => {
   h.tx(`${BT}.setMins(90)`);
   const now = h.eval("Date.now()");
   h.tx(`${BT}.start(${now})`);
   assert.eq(h.eval(`${BT}.read().dur`), 90);
   const e = entries(h, now);
-  assert.eq(e.map(x => x[0]), ["turn", "left15", "left8", "left4", "left1", "end"]);
-  [45, 75, 82, 86, 89, 90].forEach((m, i) => assert.near(e[i][1], m * MIN, 2, e[i][0]));
+  assert.eq(e.map(x => x[0]), ["turn", "back2", "back4", "back8", "end"]);
+  [45, 67.5, 78.75, 84.375, 90].forEach((m, i) => assert.near(e[i][1], m * MIN, 2, e[i][0]));
   const st = h.eval(`${BT}.status()`);
   assert.eq([st.duration, st.turn, st.phase], [90 * MIN, 45 * MIN, "out"]);
 });
 
-test("a short walk skips the buzzes that would come before the turnaround", async h => {
+test("a short walk still gets all three buzzes, at 1/2, 1/4 and 1/8 of the way back", async h => {
   h.tx(`${BT}.setMins(20)`);
   const now = h.eval("Date.now()");
   h.tx(`${BT}.start(${now})`);
-  assert.eq(entries(h, now).map(x => x[0]), ["turn", "left8", "left4", "left1", "end"]);
-  h.tx(`${BT}.setMins(10)`);
+  let e = entries(h, now);
+  assert.eq(e.map(x => x[0]), ["turn", "back2", "back4", "back8", "end"]);
+  [10, 15, 17.5, 18.75, 20].forEach((m, i) => assert.near(e[i][1], m * MIN, 2, e[i][0]));
+  h.tx(`${BT}.setMins(1)`);
   h.tx(`${BT}.start(${now})`);
-  assert.eq(entries(h, now).map(x => x[0]), ["turn", "left4", "left1", "end"]);
+  e = entries(h, now);
+  assert.eq(e.map(x => x[0]), ["turn", "back2", "back4", "back8", "end"]);
+  [30, 45, 52.5, 56.25, 60].forEach((sec, i) => assert.near(e[i][1], sec * 1000, 2, e[i][0]));
 });
 
 test("changing the length during a walk only changes the next walk", async h => {
