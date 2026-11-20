@@ -157,6 +157,16 @@ walk, the symbol left of the time of day (top row) shows it at a glance: a phone
 when the speeds come from the phone's GPS, a red crosshair while the watch's
 own GPS chip is on (the battery drain), blank before any GPS.
 
+Android Integration switches to the watch's own GPS as soon as one phone
+fix is a second later than the gap between the last two, and a phone's fixes
+are irregular (more so when it sits still), so left alone the watch's GPS
+flaps on and off all walk. During a walk BangTurn steps in: while the phone
+is connected over Bluetooth, the watch's GPS only comes on after a minute
+with no phone fix (Info's Phone GPS reads "waiting" meanwhile), and goes off
+again at the phone's next one. If Bluetooth drops, it comes on at once. The
+same applies when you change app during a walk, if the phone sent a fix in
+the last two minutes.
+
 To tell BangTurn from a faulty watch:
 
 1. Check phone GPS is set up as above, if you mean the phone to supply GPS.
@@ -171,7 +181,8 @@ To tell BangTurn from a faulty watch:
    and **Watch GPS** says whether the watch's GPS chip is powered, asked of
    the firmware itself. **Phone GPS** checks the phone GPS setup: "working",
    "setting off" (Overwrite GPS is off on the watch), "no Bluetooth" (not
-   connected to Gadgetbridge) or "no fixes" (asked, but Gadgetbridge sends
+   connected to Gadgetbridge), "waiting" (the phone's fixes have stopped
+   and the watch's GPS is held off for up to a minute) or "no fixes" (asked, but Gadgetbridge sends
    nothing: turn on Use phone gps data, and press Acquire location in
    Gadgetbridge's Settings > Location).
    With the phone supplying GPS it should read phone
