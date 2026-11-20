@@ -46,15 +46,15 @@ function press(h) {
   h.tx(`WATCHES[WATCHES.length-1]({state:false,time:getTime(),lastTime:getTime()-0.1})`);
 }
 
-test("idle screen: 60:00, time of day, press to start", async h => {
+test("idle screen: 60:00, time of day, tap to start", async h => {
   await h.load("bangturn.app.js");
-  assert.eq(screenText(h), { time: "60:00", rows: ["Press to start", "< Swipe: length"] });
+  assert.eq(screenText(h), { time: "60:00", rows: ["Tap to start", "< Swipe: length"] });
   assert.eq(h.eval("screen"), "main");
   h.tx('Bangle.setLocked(false)');
   spyDraw(h);
   h.tx('Bangle.emit("lock",false)');
   const drawn = h.eval("DRAWN");
-  for (const s of ["60:00", "Press to start"])
+  for (const s of ["60:00", "Tap to start"])
     assert(drawn.includes(s), `drew "${s}": ${JSON.stringify(drawn)}`);
   assert(drawn.some(s => /^\d\d:\d\d:\d\d$/.test(s)), "drew the time with seconds: " + JSON.stringify(drawn));
   assert(!drawn.some(s => s.indexOf("Turn around") >= 0), "no turnaround line");
@@ -198,13 +198,49 @@ test("tap on idle screen starts the walk; tap while running does nothing", async
   assert.eq(h.eval("screen"), "main");
 });
 
-test("button on idle screen starts the walk", async h => {
+test("button on idle screen opens the idle menu and never starts a walk", async h => {
   await h.load("bangturn.app.js");
+  spyMenu(h);
   captureButton(h);
   press(h);
   await h.wait(100);
+  assert(!h.eval(`${BT}.isActive()`), "no walk started");
+  assert.eq(h.eval("screen"), "menu");
+  assert.eq(menuItems(h), ["Start walk", "Length: 60 min"]);
+  // the menu's back (what the button does in a menu) returns to idle
+  h.tx('MENU[""].back()');
+  assert.eq(h.eval("screen"), "main");
+  assert(!h.eval(`${BT}.isActive()`), "still no walk");
+  assert.eq(screenText(h).rows, ["Tap to start", "< Swipe: length"]);
+});
+
+test("idle menu: Start walk starts the walk", async h => {
+  await h.load("bangturn.app.js");
+  spyMenu(h);
+  h.tx("showIdleMenu()");
+  h.tx('MENU["Start walk"]()');
+  await h.wait(100);
   assert(h.eval(`${BT}.isActive()`), "walk started");
   assert.eq(h.eval("screen"), "main");
+  assert.eq(h.eval("MENU"), null, "menu closed");
+});
+
+test("idle menu: Length opens the picker", async h => {
+  await h.load("bangturn.app.js");
+  spyMenu(h);
+  h.tx("showIdleMenu()");
+  h.tx('MENU["Length: 60 min"]()');
+  assert.eq(h.eval("screen"), "picker");
+  assert(!h.eval(`${BT}.isActive()`), "no walk started");
+});
+
+test("idle menu returns to the idle screen after 10 s without input", async h => {
+  await h.load("bangturn.app.js");
+  h.tx("MENU_TIMEOUT=500");
+  h.tx("showIdleMenu()");
+  await h.wait(800);
+  assert.eq(h.eval("screen"), "main");
+  assert(!h.eval(`${BT}.isActive()`), "no walk started");
 });
 
 test("button while running opens the menu: Resume, -1 min, Cancel walk, GPS rows", async h => {
@@ -261,7 +297,7 @@ test("-1 min past the end returns to the idle screen", async h => {
   h.tx("showWalkMenu()");
   h.tx('MENU["-1 min"]()');
   assert.eq(h.eval("screen"), "main");
-  assert.eq(screenText(h).rows, ["Press to start", "< Swipe: length"]);
+  assert.eq(screenText(h).rows, ["Tap to start", "< Swipe: length"]);
 });
 
 test("Cancel walk clears the walk and shows the idle screen", async h => {
@@ -273,7 +309,7 @@ test("Cancel walk clears the walk and shows the idle screen", async h => {
   assert.eq(h.eval("screen"), "main");
   assert.eq(h.eval(`${BT}.read()`), {});
   assert.eq(h.eval(`${BT}.getSched()`), []);
-  assert.eq(screenText(h), { time: "60:00", rows: ["Press to start", "< Swipe: length"] });
+  assert.eq(screenText(h), { time: "60:00", rows: ["Tap to start", "< Swipe: length"] });
 });
 
 test("menu returns to the countdown after 10 s without input", async h => {
@@ -301,7 +337,7 @@ test("walk ending while the menu is open returns to idle", async h => {
   h.tx("showWalkMenu()");
   h.tx(`${BT}.fire("end")`);
   assert.eq(h.eval("screen"), "main");
-  assert.eq(screenText(h).rows, ["Press to start", "< Swipe: length"]);
+  assert.eq(screenText(h).rows, ["Tap to start", "< Swipe: length"]);
 });
 
 test("turnaround alert then the countdown", async h => {
