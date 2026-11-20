@@ -61,7 +61,7 @@ On the walk screen:
   - After the **target** symbol, the speed needed: distance home / time left on the countdown, the speed that brings you to the origin as the countdown reaches 0. On the way out that is for turning around right now, so it starts low and climbs to about your Out speed by the turnaround.
   - After the **speedometer** symbol, your speed now: over the last 20 s.
   - Then the **difference**, now less needed, from the two numbers as shown: `-0.3` is 0.3 kph too slow, `+0.4` is faster than needed, `0.0` has no sign. It always has room for a sign, so nothing moves as it passes zero.
-- The difference is **green** on the speed needed. It shades towards **red** as you fall behind (fully red at 1 kph or more under) and towards the normal text colour (black on the light theme) as you get ahead (fully at 1 kph or more over). The screen has 8 colours, so the shades in between are dithered. The other two numbers and the symbols stay the normal colour.
+- The speed now and the difference are **green** on the speed needed. They shade towards **red** as you fall behind (fully red at 1 kph or more under) and towards the normal text colour (black on the light theme) as you get ahead (fully at 1 kph or more over). The screen has 8 colours, so the shades in between are dithered. The speed needed, the symbols and the kph stay the normal colour.
 - `--` where there's nothing to show: no GPS yet, no Back speed yet, a speed of 0 (you'd never arrive), no good fix in the last 15 s for the speed now, or no difference without both speeds. A needed speed of 100 kph or more shows `99+`.
 
 ## Alerts

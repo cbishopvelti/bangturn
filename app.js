@@ -48,7 +48,7 @@ function kph(v) {
   return n >= 1000 ? "99+" : Math.floor(n / 10) + "." + (n % 10);
 }
 
-/* The colour of the difference between the speed now and the speed needed,
+/* The colour of the speed now and of its difference from the speed needed,
    from lines()'s c: green on the speed needed, shading to red as you fall
    BAND kph behind it, and to the normal text colour (black on the light
    theme) as you get BAND ahead. The screen has 8 colours, so the shades in
@@ -101,7 +101,7 @@ function hms(t, secs) {
      speed needed (the one that covers the way home in the time left on the
      countdown) and d the difference, v less w, with its sign ("-0.3" is
      0.3 kph too slow; "--" when either is unknown). c is the same
-     comparison for d's colour (see nowColour): 0 on the speed needed, down
+     comparison for the colour of v and d (see nowColour): 0 on the speed needed, down
      to -1 for BAND kph or more too slow, up to 1 for BAND or more faster
      than needed; undefined when either is unknown. */
 function lines(st, now) {
@@ -219,8 +219,8 @@ function onGPSIcon(f) {
 }
 
 /* The bottom row: the speed needed after a target symbol, the speed now
-   after a speedometer, then the difference in its colour, with one "kph"
-   for all three at the end:
+   after a speedometer, then the difference, both in the colour that says
+   how they compare (see nowColour), with one "kph" for all three at the end:
      (o) 5.2   (/) 4.9   -0.3 kph
    The difference always has room for a sign, so nothing moves as it
    passes 0.0. All three shrink together when one is long (10 kph or more). */
@@ -239,8 +239,8 @@ function drawGoal(r, y) {
   g.drawCircle(x, y, 6).drawCircle(x, y, 3).fillRect(x, y, x, y); // the target
   g.setFontAlign(-1, 0).drawString(r.w, x1 + IW, y);
   x = Math.round(x1 + IW + ww + gap);
-  g.drawImage(GAUGE, x, y - 5).drawString(r.v, x + IW, y);
-  g.setFontAlign(1, 0).setColor(nowColour(r.c)).drawString(r.d, x2 - kw, y).setColor(g.theme.fg);
+  g.drawImage(GAUGE, x, y - 5).setColor(nowColour(r.c)).drawString(r.v, x + IW, y);
+  g.setFontAlign(1, 0).drawString(r.d, x2 - kw, y).setColor(g.theme.fg);
 }
 
 /* The walk's rows, in columns so the numbers line up and don't move:

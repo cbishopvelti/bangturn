@@ -183,7 +183,8 @@ walk back) Back, each with its average and the time to the origin at that
 speed (`v.home / speed`), and a bottom row with the speed needed
 (`v.home / status().remaining`), `v.now` and the difference between them.
 `drawRows()` draws the first two in columns and `drawGoal()` the bottom row,
-with a target and a speedometer symbol and the difference in its colour.
+with a target and a speedometer symbol, and the speed now and the
+difference in the colour that says how they compare.
 Calling `get()` every second is fine: it only reads RAM.
 
 How it tracks:

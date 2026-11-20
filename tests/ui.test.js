@@ -298,7 +298,7 @@ test("locked: times to the origin grey their seconds and stay in place; rows don
   assert(!out.some(a => a[0] == "Back"), "no Back row yet");
 });
 
-test("the difference is green on the speed needed, towards red when slower, towards the text colour when faster", async h => {
+test("the speed now and the difference are green on the speed needed, towards red when slower, towards the text colour when faster", async h => {
   fakeSpeed(h);
   h.tx(`${BT}.start(${h.eval("Date.now()") - 40 * MIN})`);
   await h.load("bangturn.app.js");
@@ -321,16 +321,20 @@ test("the difference is green on the speed needed, towards red when slower, towa
   assert.eq(h.eval("nowColour(undefined)"), fg);
   assert.eq(h.eval("nowColour(-0.5)"), h.eval("g.toColor(0.5,0.5,0)"), "halfway between green and red");
   assert.eq(h.eval("nowColour(0.5)"), h.eval("g.toColor(0,0.5,0)"), "halfway between green and black");
-  // on screen: only the difference is coloured (it ends before the kph)
+  // on screen: the speed now and the difference are coloured, nothing else
+  // (the symbols and the speed needed before them, the kph after)
   const R = h.eval("Bangle.appRect");
   const colours = (x1, x2) => h.eval(`(function(){var c={};for(var y=${R.y2 - 22};y<=${R.y2 - 2};y++)for(var x=${x1};x<=${x2};x++){var p=g.getPixel(x,y);if(p!=g.theme.bg)c[p]=1}return Object.keys(c).map(function(k){return +k})})()`);
   h.tx("global.SP={out:5,back:5,now:3,home:1.5};tick()");
   assert.eq(rawRows(h)[2].d, "-1.5");
   assert.eq(colours(R.x2 - 68, R.x2 - 27), [col("#f00")], "the difference is red when far too slow");
-  assert.eq(colours(R.x, R.x2 - 72), [fg], "the symbols, the speed needed and the speed now keep the text colour");
+  h.tx(`global.AT=[];(function(o){g.drawString=function(s,x,y){AT.push([""+s,Math.round(x)]);return o.apply(g,arguments)}})(g.drawString);tick()`);
+  const nowX = h.eval("AT").find(a => a[0] == "3.0")[1]; // where the speed now starts
+  assert.eq(colours(nowX, R.x2 - 72), [col("#f00")], "so is the speed now");
+  assert.eq(colours(R.x, nowX - 1), [fg], "the symbols and the speed needed keep the text colour");
   assert.eq(colours(R.x2 - 24, R.x2), [fg], "so does the kph");
   h.tx("global.SP={out:5,back:5,now:9,home:1.5};tick()");
-  assert.eq(colours(R.x2 - 68, R.x2 - 27), [fg], "the text colour when well ahead");
+  assert.eq(colours(R.x, R.x2), [fg], "the text colour when well ahead");
   // the symbols: a target at the left, a speedometer before the speed now
   assert.eq(h.eval(`g.getPixel(${R.x + 9},${R.y2 - 11})`), fg, "the target's centre");
 });

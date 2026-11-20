@@ -137,7 +137,7 @@ before a check that needs the watch on your wrist.
 11. **Way home.** On the same walk, watch the times next to the speeds and
     the bottom row. Walking steadily, the speed now (after the speedometer)
     should sit near your average and not jump about by more than a few
-    tenths (it is the last 20 s). The difference at the end should be green
+    tenths (it is the last 20 s). It and the difference at the end should be green
     near 0.0, red with a minus when you are too slow, and readable in
     daylight. Walk a
     small loop or a there-and-back detour on the way out: the times should
