@@ -304,10 +304,13 @@ function gpsApps() {
    - Gadgetbridge sending fixes: its Bangle.js device setting "Use phone gps
      data" (off by default), and location permission plus "Keep location
      updated" (Gadgetbridge Settings > Location > Acquire location). The
-     watch can't read those, so if fixes don't come it says "no fixes". */
+     watch can't read those, so if fixes don't come it says "no fixes".
+   "waiting": the phone's fixes have stopped and BangTurn is holding the
+   watch's own GPS off for up to a minute, for the phone's next one. */
 function phoneGPS(src) {
   if (typeof Bangle.moveGPSPower != "function") return "setting off";
   if (!NRF.getSecurityStatus().connected) return "no Bluetooth";
+  if (src.wait) return "waiting";
   if (src.from == "phone") return "working";
   return bt.isActive() ? "no fixes" : "no walk"; // only asked for during a walk
 }
