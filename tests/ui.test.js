@@ -437,6 +437,12 @@ test("Info from the start screen's menu, and back to that menu", async h => {
   assert.eq(h.eval(`${BT}.isActive()`), false, "no walk started");
 });
 
+/* The colours used in the Out row and the progress bar, other than the background */
+const rowColours = (h, R) => h.eval(`(function(){var c={};
+  [[${R.y + 78},${R.y + 98}],[${R.y2 - 16},${R.y2 - 5}]].forEach(function(b){
+  for(var y=b[0];y<=b[1];y++)for(var x=${R.x};x<=${R.x2};x++){var p=g.getPixel(x,y);if(p!=g.theme.bg)c[p]=1}});
+  return Object.keys(c).map(function(k){return +k})})()`);
+
 test("walk screen: GPS symbol shows phone or watch, and follows GPS events", async h => {
   await h.load("bangturn.app.js");
   assert.eq(h.eval("drawnIcon===undefined"), true, "no symbol on the start screen");
@@ -454,9 +460,16 @@ test("walk screen: GPS symbol shows phone or watch, and follows GPS events", asy
   await h.wait(100);
   assert.eq(h.eval("drawnIcon"), "watch");
   assert.eq(h.eval(`g.getPixel(${R.x + 8},${R.y + 12})`), h.eval('g.toColor("#f00")'), "red crosshair centre, left of the time");
-  // the symbol survives a full redraw
+  // the symbol survives a full redraw, and the rest of the screen keeps the
+  // theme's colours (the speed row and bar once came out red, or invisible)
   h.tx("tick()");
   assert.eq(h.eval("drawnIcon"), "watch");
+  assert.eq(rowColours(h, R), [h.eval("g.theme.fg")], "Out row in the normal colour after the red symbol");
+  h.tx('Bangle.getGPSFix=function(){return undefined};Bangle.emit("GPS",{fix:1,lat:51.5,lon:-0.12,hdop:1,satellites:8,time:new Date(),externalSource:true})');
+  await h.wait(100);
+  h.tx("tick()");
+  assert.eq(h.eval("drawnIcon"), "phone");
+  assert.eq(rowColours(h, R), [h.eval("g.theme.fg")], "Out row visible after the green symbol");
   h.tx(`${BT}.cancel()`);
   await h.wait(200);
   assert.eq(h.eval("drawnIcon===undefined"), true, "gone when the walk ends");
