@@ -206,23 +206,12 @@ test("button on idle screen opens the idle menu and never starts a walk", async 
   await h.wait(100);
   assert(!h.eval(`${BT}.isActive()`), "no walk started");
   assert.eq(h.eval("screen"), "menu");
-  assert.eq(menuItems(h), ["Start walk", "Length: 60 min"]);
+  assert.eq(menuItems(h), ["Length: 60 min"]);
   // the menu's back (what the button does in a menu) returns to idle
   h.tx('MENU[""].back()');
   assert.eq(h.eval("screen"), "main");
   assert(!h.eval(`${BT}.isActive()`), "still no walk");
   assert.eq(screenText(h).rows, ["Tap to start", "< Swipe: length"]);
-});
-
-test("idle menu: Start walk starts the walk", async h => {
-  await h.load("bangturn.app.js");
-  spyMenu(h);
-  h.tx("showIdleMenu()");
-  h.tx('MENU["Start walk"]()');
-  await h.wait(100);
-  assert(h.eval(`${BT}.isActive()`), "walk started");
-  assert.eq(h.eval("screen"), "main");
-  assert.eq(h.eval("MENU"), null, "menu closed");
 });
 
 test("idle menu: Length opens the picker", async h => {

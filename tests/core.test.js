@@ -274,7 +274,12 @@ test("sched fires the turnaround: app loads and shows the alert", async h => {
   const now = h.eval("Date.now()");
   h.tx(`${BT}.start(${now - TURN + 1500})`);
   await h.load(); // like leaving the app for the clock
-  for (let i = 0; i < 40 && h.eval("global.__FILE__") != "bangturn.app.js"; i++) await h.wait(100);
+  // sched's load() can reset the interpreter while an eval is in flight,
+  // which loses the reply: retry until the app is up (as walk.test's waitFor)
+  for (let i = 0; i < 40; i++) {
+    try { if (h.eval("global.__FILE__") == "bangturn.app.js") break; } catch (e) {}
+    await h.wait(100);
+  }
   await h.wait(300);
   assert.eq(h.eval("global.__FILE__"), "bangturn.app.js", "app loaded");
   const s = h.eval(`${BT}.read()`);
