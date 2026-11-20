@@ -88,8 +88,8 @@ function drawClock(L) {
 }
 
 /* Draws the main screen; returns the status it drew */
-function draw() {
-  var st = bt.status();
+function draw(st) {
+  st = st || bt.status();
   var L = lines(st);
   var R = Bangle.appRect, x = R.x + R.w / 2, w = R.w - 4, y = R.y;
   g.reset().clearRect(R).setFontAlign(0, 0);
@@ -125,7 +125,12 @@ function draw() {
 function tick() {
   stopTimers();
   if (screen != "main") return;
-  var st = draw();
+  // time's up but the "end" wake-up hasn't come (sched missed it): end the
+  // walk (its "end" event redraws the idle screen) rather than redrawing
+  // 0 every second
+  var st = bt.status();
+  if (st.active && st.remaining <= 0) return bt.finish();
+  draw(st);
   var period = Bangle.isLocked() ? 60000 : 1000;
   clockTimer = setTimeout(clockTick, period - (Date.now() % period) + 20);
   if (!st.active) return;

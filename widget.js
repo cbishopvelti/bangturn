@@ -15,6 +15,9 @@
     to = undefined;
     var st = require("bangturn").status();
     if (!st.active) return update();
+    // time's up but the "end" wake-up hasn't come (sched missed it): end the
+    // walk rather than redrawing a 0 every second for ever
+    if (st.remaining <= 0) return require("bangturn").finish();
     WIDGETS.bangturn.draw(st);
     /* next change of the minutes, +50 ms margin */
     to = setTimeout(tick, require("bangturn").untilMins(st.remaining) + 50);

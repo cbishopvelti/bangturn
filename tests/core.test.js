@@ -234,7 +234,7 @@ test("fire(turn): marks turned, flags the alert and loads the app", async h => {
 });
 
 test("fire(end): finishes silently", async h => {
-  h.tx(`${BT}.start(${h.eval("Date.now()") - DUR})`);
+  h.tx(`${BT}.start(${h.eval("Date.now()") - DUR + 5000})`); // 5 s left: a walk already past its end is ended by the widget
   listen(h);
   h.tx(`global.BUZZ=[];Bangle.buzz=function(ms){BUZZ.push(ms);return Promise.resolve()}`);
   h.tx(`${BT}.fire("end")`);

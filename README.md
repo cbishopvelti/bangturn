@@ -112,3 +112,39 @@ before a check that needs the watch on your wrist.
 If you use the Alarms app: BangTurn's entries are hidden there, but its
 Advanced menu's Disable All and Delete All also switch off or remove the
 entries of a walk that's running.
+
+## Battery
+
+BangTurn costs nothing when no walk is running: no timers, no GPS, no
+wake-ups left in the scheduler (checked in the emulator by
+`tests/battery.test.js`). During a walk it keeps GPS on for the speeds and
+the widget redraws once a minute; GPS goes off at the end, on Cancel walk,
+and by itself shortly after the end if anything else misses it.
+
+What to expect (the emulator can't measure power, so these are rough):
+
+- **No walks:** a Bangle.js 2 on a plain clock, connected to Gadgetbridge,
+  usually lasts one to two weeks, so a few percent a day. Heart rate
+  monitoring set to continuous or frequent, a long backlight timeout, or lots
+  of notifications cut that a lot.
+- **A walk with the watch's own GPS:** the GPS chip draws about 20 mA, so
+  roughly 10 to 20% of the battery per hour.
+- **A walk with the phone's GPS** (Android Integration, "Overwrite GPS" on):
+  the watch's GPS chip goes off once the phone's fixes arrive, so the walk
+  should cost the watch much less. The phone's battery pays instead. If the
+  phone stops sending fixes, the watch's own GPS takes over.
+
+To tell BangTurn from a faulty watch:
+
+1. Check Settings > Apps > Android Integration > Overwrite GPS is on, if you
+   mean the phone to supply GPS. If it's off, every walk runs the watch's GPS.
+2. Charge to 100% and leave the watch on the clock for a day with no walk.
+   BangTurn does nothing then, so a big drop (say over 15 to 20% in a day)
+   isn't BangTurn: check the Health app's heart rate setting and the
+   backlight timeout. To be sure, uninstall BangTurn and repeat.
+3. Note the battery before and after one walk to see what a walk costs.
+4. The Power Manager app's widget shows a G while something has GPS on, and
+   its logging can show which code keeps waking the watch.
+
+A watch that still drains fast with nothing installed beyond the defaults
+may be faulty: Espruino's forum and support can help.

@@ -32,6 +32,7 @@ var MIN_MOVE = 0.01;  // km: distance is counted in steps of at least 10 m
 var MAX_REJECT = 5;   // jumps in a row before restarting from the new position
 var MIN_MS = 10000;   // tracked time a half needs before it has an average
 var SAVE_MS = 60000;  // save to Storage at most this often
+var END_MARGIN = 1500; // after the walk's end, GPS goes off by this (ms)
 var KM_PER_DEG = 111.195;
 
 /* Saved as bangturn.gps.json:
@@ -50,6 +51,7 @@ var DUR;            // the walk's length (ms)
 var tracking = false;
 var dirty = false;  // S has changed since it was saved
 var saved;          // fix time of the last save
+var endTimer;       // fires just after the walk's end (see armEnd)
 
 function save() {
   if (!dirty || !S) return;
@@ -58,6 +60,7 @@ function save() {
 }
 
 function listen() {
+  armEnd();
   if (tracking) return;
   tracking = true;
   Bangle.setGPSPower(1, "bangturn");
@@ -65,8 +68,26 @@ function listen() {
   E.on("kill", save);
 }
 
+/* GPS is the biggest drain on the battery, so it must go off when the walk's
+   time is up even if nothing else notices: the core's "end" wake-up can be
+   lost (sched missing it) and, with phone GPS or no signal, there may be no
+   GPS event to notice it in onGPS. So a timer just after the end turns GPS
+   off and ends the walk, unless the core already has. Re-armed when "-1 min"
+   moves the end. */
+function armEnd() {
+  if (endTimer) clearTimeout(endTimer);
+  endTimer = setTimeout(function () {
+    endTimer = undefined;
+    stop();
+    var bt = require("bangturn");
+    if (bt.isActive() && bt.status().remaining <= 0) bt.finish();
+  }, Math.max(0, T0 + DUR - Date.now()) + END_MARGIN);
+}
+
 /* Stop tracking and turn GPS off, keeping the numbers. */
 function stop() {
+  if (endTimer) clearTimeout(endTimer);
+  endTimer = undefined;
   if (tracking) {
     tracking = false;
     Bangle.removeListener("GPS", onGPS);
@@ -176,7 +197,10 @@ exports.event = function (type) {
     stop();
     begin(s, true);
   } else if (!S || S.start !== s.start) begin(s);
-  else T0 = require("bangturn").startTime(s); // "-1 min" moves the turnaround
+  else {
+    T0 = require("bangturn").startTime(s); // "-1 min" moves the turnaround
+    if (tracking) armEnd(); // and the end
+  }
 };
 
 /* Distance (counted steps plus the step in progress) and tracked time of
