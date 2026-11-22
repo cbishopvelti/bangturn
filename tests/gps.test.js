@@ -7,14 +7,15 @@
    can "walk" for half an hour in a moment. Which half of the walk a fix
    belongs to follows the watch's real clock, which can't be moved: tests
    get to the walk back with -1 min, or by starting the walk in the past. */
-const { test, assert } = require("./harness");
+const { test, assert, speedRows } = require("./harness");
 
 const MIN = 60000;
 const BT = 'require("bangturn")';
 const SP = 'require("bangturn.speed")';
 const FILE = "bangturn.gps.json";
 
-const speeds = h => h.eval(`${SP}.get()`);
+/* the average speeds (get() also has the speed now and the way home: see home.test.js) */
+const speeds = h => h.eval(`(function(v){return {out:v.out,back:v.back}})(${SP}.get())`);
 const stats = h => h.eval(`${SP}.stats()`);
 const saved = h => h.eval(`require("Storage").readJSON("${FILE}",1)||false`); // false: no file
 const gpsOn = h => h.eval(`!!(global.GPS_USERS && GPS_USERS.bangturn)`); // see harness
@@ -194,7 +195,7 @@ test("a lost signal is bridged in a straight line", async h => {
 });
 
 test("the app shows the tracked speeds, rounded to one decimal", async h => {
-  const rows = () => h.eval(`lines(${BT}.status()).rows`);
+  const rows = () => speedRows(h.eval(`lines(${BT}.status()).rows`));
   const w = walker(h);
   await h.load("bangturn.app.js");
   start(h);
@@ -241,12 +242,12 @@ test("Out freezes at the turnaround (reached with -1 min); Back starts from zero
 
 test("the real turnaround: sched fires, the app loads, Out freezes", async h => {
   const w = walker(h);
-  start(h, 30 * MIN - 2000); // turnaround in 2 s
+  start(h, 30 * MIN - 5000); // turnaround in 5 s
   w.walk(5, 1500, { step: 10 });
   const out = stats(h);
   assert.eq(h.eval(`${BT}.status().phase`), "out");
   assert.eq(out.backMs, 0);
-  await h.wait(3000);
+  await h.wait(6000);
   assert.eq(h.eval("global.__FILE__"), "bangturn.app.js", "the alarm opened the app");
   assert.eq(h.eval(`${BT}.status().turned`), true);
   assert.eq(gpsOn(h), true, "GPS stays on for the walk back");

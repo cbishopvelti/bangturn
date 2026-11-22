@@ -23,7 +23,7 @@ test("metadata.json: fields the App Loader needs, files, version", async () => {
     assert(listed.includes(f), `${f} is installed`);
   assert(fs.existsSync(path.join(ROOT, meta.readme)), "README exists");
   // the data files are the ones the code writes
-  assert.eq(meta.data.map(d => d.name).sort(), ["bangturn.gps.json", "bangturn.json", "bangturn.settings.json"]);
+  assert.eq(meta.data.map(d => d.name).sort(), ["bangturn.gps.json", "bangturn.json", "bangturn.settings.json", "bangturn.trail"]);
   assert(/"bangturn\.json"/.test(fs.readFileSync(path.join(ROOT, "lib.js"), "utf8")));
   assert(/"bangturn\.gps\.json"/.test(fs.readFileSync(path.join(ROOT, "speed.js"), "utf8")));
   // the App Loader shows the last ChangeLog entry as the version's notes
