@@ -21,3 +21,13 @@ jobs:
         with:
           name: bangturn-install
           path: dist/bangturn-install.js
+  store-check:
+    # The checks the official app store (espruino/BangleApps) runs on a PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: sh tools/store-check.sh "$RUNNER_TEMP/BangleApps"
