@@ -181,6 +181,88 @@ test("a whole walk: start, turnaround alarm, countdown buzzes, silent end", asyn
   assert.eq(widget(h), 0, "widget hidden");
 });
 
+/* End the walk running in the open app: the "end" wake-up fires a second
+   or so later. Returns once it has. */
+async function endInApp(h) {
+  jump(h, DUR - 1500);
+  assert(await waitFor(h, `!${BT}.isActive()`, 4000), "walk ended");
+  assert.eq(file(h), "bangturn.app.js", "still in the app at the end");
+  assert.eq(h.eval("screen"), "main", "idle screen");
+}
+
+test("8 min after the countdown ends with the app open, back to the clock (locked)", async h => {
+  await record(h);
+  await startInApp(h);
+  h.tx("Bangle.setLocked(true)");
+  await endInApp(h);
+  await h.wait(8 * MIN - 5000);
+  assert.eq(file(h), "bangturn.app.js", "still open just before 8 min");
+  await h.wait(6000);
+  assert(file(h) != "bangturn.app.js", "back on the clock after 8 min");
+  assert(h.eval("Bangle.isLocked()"), "still locked");
+  assert.eq(buzzes(h), [], "no buzz");
+  assert.eq(state(h), {}, "no walk");
+});
+
+test("8 min after the end, unlocked, from the walk menu: back to the clock", async h => {
+  await record(h);
+  await startInApp(h);
+  h.tx("Bangle.setLocked(false)");
+  spyMenu(h);
+  await press(h);
+  assert.eq(h.eval("screen"), "menu", "walk menu open at the end");
+  await endInApp(h);
+  await h.wait(8 * MIN + 1000);
+  assert(file(h) != "bangturn.app.js", "back on the clock");
+});
+
+test("after the end, the button menu or a new walk keeps the app open", async h => {
+  await record(h);
+  await startInApp(h);
+  h.tx("Bangle.setLocked(false)");
+  await endInApp(h);
+  spyMenu(h);
+  await press(h);
+  assert.eq(h.eval("screen"), "menu", "idle menu");
+  await press(h);
+  await h.wait(8 * MIN + 1000);
+  assert.eq(file(h), "bangturn.app.js", "button press kept it open");
+
+  // a new walk started within the 8 min isn't closed either
+  await h.load("bangturn.app.js");
+  h.tx('Bangle.emit("touch",1,{x:88,y:100,type:0})');
+  await h.wait(300);
+  await endInApp(h);
+  await h.wait(MIN);
+  h.tx('Bangle.emit("touch",1,{x:88,y:100,type:0})');
+  await h.wait(300);
+  assert(h.eval(`${BT}.isActive()`), "second walk started");
+  await h.wait(8 * MIN);
+  assert.eq(file(h), "bangturn.app.js", "walk running, still open");
+});
+
+test("cancelling a walk or opening the app after the end doesn't close it", async h => {
+  await record(h);
+  await startInApp(h);
+  spyMenu(h);
+  h.tx("Bangle.setLocked(false)");
+  await press(h);
+  pick(h, "Cancel walk");
+  await h.wait(8 * MIN + 1000);
+  assert.eq(file(h), "bangturn.app.js", "open after cancelling");
+
+  // the walk ends on the clock; opening the app later keeps it open
+  h.tx('Bangle.emit("touch",1,{x:88,y:100,type:0})');
+  await h.wait(300);
+  await h.load();
+  jump(h, DUR - 1500);
+  assert(await waitFor(h, `!${BT}.isActive()`, 4000), "walk ended");
+  await h.wait(MIN);
+  await h.load("bangturn.app.js");
+  await h.wait(8 * MIN + 1000);
+  assert.eq(file(h), "bangturn.app.js", "still open");
+});
+
 test("-1 min from the menu across the turnaround: no alarm, way back rows", async h => {
   await record(h);
   await startInApp(h);
