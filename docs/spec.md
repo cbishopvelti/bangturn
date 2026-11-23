@@ -13,7 +13,7 @@ Tell you when to turn around on an out-and-back walk. Start it when you set off 
 3. You can leave the app and go back to the clock. The timer keeps running in the background.
 4. When the countdown reaches 30 minutes left, the watch vibrates with a distinct pattern and shows **TURN AROUND**.
 5. The alarm stops as soon as the watch unlocks (you raise your wrist to look, press the button or tap), or after 6 seconds, whichever comes first.
-6. The countdown carries on for the walk back, with short countdown buzzes at half, a quarter and an eighth of the way back left (15, 7.5 and 3.75 minutes on an hour walk). At zero the walk ends silently (no buzz): GPS turns off and the app returns to the idle screen.
+6. The countdown carries on for the walk back, with short countdown buzzes at half, a quarter and an eighth of the way back left (15, 7.5 and 3.75 minutes on an hour walk). At zero the walk ends silently (no buzz): GPS turns off and the app returns to the idle screen. If the app is open then, it goes back to the watch's clock 8 minutes later (locked or not), unless you pressed the button or started another walk in the meantime. Cancelling a walk, or opening the app after the walk has ended, doesn't do this.
 
 ## Duration
 

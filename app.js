@@ -26,6 +26,13 @@ var screen;      // "main" or "menu"
 var drawTimer;   // pending redraw of the main screen
 var clockTimer;  // pending redraw of just the time of day
 var menuTimer;   // pending return from the menu to the main screen
+var closeTimer;  // pending return to the clock after a walk's countdown ended
+
+/* After the countdown reaches 0 with the app open, it goes back to the
+   watch's clock this long later (Chris, 2026-11-23), locked or not. Only
+   from the idle screen it showed at the end: pressing the button there
+   (the idle menu) or tapping to start another walk keeps the app open. */
+var CLOSE_AFTER = 8 * 60000;
 
 Bangle.loadWidgets();
 // the countdown is on screen, so the minutes-left widget is redundant here
@@ -366,7 +373,7 @@ function showMain() {
     mode: "custom",
     // the button never starts a walk (a tap does): it opens a menu, and
     // in the menu it comes back here
-    btn: function () { if (bt.isActive()) showWalkMenu(); else showIdleMenu(); },
+    btn: function () { if (bt.isActive()) showWalkMenu(); else { stopClose(); showIdleMenu(); } },
     touch: function () { if (!bt.isActive()) start(); },
     // swipe right: back to the clock (the walk keeps running). No left
     // swipe: another app on the watch uses swipes, so the length is in
@@ -483,7 +490,21 @@ function showInfo(selected) {
   startMenuTimer();
 }
 
+function stopClose() {
+  if (closeTimer) clearTimeout(closeTimer);
+  closeTimer = undefined;
+}
+function armClose() {
+  stopClose();
+  closeTimer = setTimeout(function () {
+    closeTimer = undefined;
+    if (screen == "main" && !bt.isActive()) load();
+  }, CLOSE_AFTER);
+}
+
 function onEvent(type) {
+  if (type == "end") armClose();
+  else if (type == "start" || type == "cancel") stopClose();
   if (screen == "main") tick();
   else if (screen == "menu" && (type == "end" || type == "cancel")) showMain();
 }
