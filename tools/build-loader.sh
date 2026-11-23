@@ -11,7 +11,7 @@
 # tools/build-previews.sh also uses it to build one loader per open pull
 # request, with these optional settings:
 #   BANGTURN_SRC      folder to take BangTurn's files from (default: this repo)
-#   BANGTURN_VERSION  full version to publish (default: 0.01.<commit count>)
+#   BANGTURN_VERSION  full version to publish (default: <version>.<commit count>, e.g. 1.00.42)
 #   BANGTURN_PR       PR number: adds a "preview of PR #N" banner and label
 #   BANGTURN_PR_URL, BANGTURN_PR_BRANCH  shown in that banner
 #   LOADER_FROM       an already built loader to copy instead of cloning
@@ -47,7 +47,7 @@ else
 fi
 
 # Build number: commits on the checked-out branch, so it goes up every time
-# main changes. It becomes the third part of the version (0.01 -> 0.01.42),
+# main changes. It becomes the third part of the version (1.00 -> 1.00.42),
 # which the App Loader compares numerically and offers as an update. Needs
 # full history (fetch-depth: 0 in the workflow); without git it's left off.
 BUILD=${BANGTURN_BUILD:-$(git -C "$REPO_DIR" rev-list --count HEAD 2>/dev/null || true)}
@@ -56,21 +56,16 @@ BUILD=${BANGTURN_BUILD:-$(git -C "$REPO_DIR" rev-list --count HEAD 2>/dev/null |
 mkdir -p apps/bangturn
 node -e '
 const fs = require("fs"), path = require("path");
-const [src, dst, build] = process.argv.slice(1);
+const [src, dst, build, repo] = process.argv.slice(1);
 const env = process.env;
+require(path.join(repo, "tools/app-files.js")).copy(src, dst);
 const m = JSON.parse(fs.readFileSync(path.join(src, "metadata.json"), "utf8"));
-const files = new Set(["metadata.json", "ChangeLog", m.icon, m.readme]);
-for (const s of m.storage) if (s.url) files.add(s.url);
-for (const f of files) {
-  if (!f || !fs.existsSync(path.join(src, f))) continue;
-  fs.copyFileSync(path.join(src, f), path.join(dst, f));
-}
 if (env.BANGTURN_VERSION) m.version = env.BANGTURN_VERSION;
 else if (/^[0-9]+$/.test(build || "")) m.version = m.version + "." + build;
 if (env.BANGTURN_PR) m.description = "Preview of PR #" + env.BANGTURN_PR + ", not merged yet. " + m.description;
 fs.writeFileSync(path.join(dst, "metadata.json"), JSON.stringify(m, null, 2) + "\n");
 console.log("bangturn version " + m.version);
-' "$SRC" apps/bangturn "$BUILD"
+' "$SRC" apps/bangturn "$BUILD" "$REPO_DIR"
 
 # apps.json is normally made by Jekyll on GitHub Pages; build it directly.
 node -e '

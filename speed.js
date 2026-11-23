@@ -345,7 +345,6 @@ function trail(lat, lon) {
 }
 
 function onGPS(f) {
-  var bt = require("bangturn");
   var el = Date.now() - T0;
   // Gadgetbridge's fixes (Android Integration, "Overwrite GPS") are marked
   // externalSource; the watch's own GPS sends an event a second, fix or not

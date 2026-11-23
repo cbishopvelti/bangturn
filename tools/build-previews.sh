@@ -7,9 +7,9 @@
 # so PR #33 installs from <site>/pr-33/. Only PRs whose branch is in this
 # repository get one, never forks. The PR's files are only copied, never run.
 #
-# Version: 0.01.<main's build>.<commits the PR is ahead of main>, e.g.
-# 0.01.32.3. The App Loader offers it as an update over main's 0.01.32, and
-# main's next build (0.01.33, once the PR is merged) as an update over it.
+# Version: 1.00.<main's build>.<commits the PR is ahead of main>, e.g.
+# 1.00.32.3. The App Loader offers it as an update over main's 1.00.32, and
+# main's next build (1.00.33, once the PR is merged) as an update over it.
 #
 # Needs GITHUB_REPOSITORY (owner/name) and GH_TOKEN for the GitHub API, and
 # full history with origin/main fetched. Writes <outdir>/previews.json.
