@@ -1,5 +1,6 @@
 /* The files that make up the app in a BangleApps checkout (apps/bangturn/):
-   metadata.json, ChangeLog, the icon, README, screenshots and every storage
+   metadata.json, ChangeLog, the icon, README, the App Loader page (interface),
+   screenshots and every storage
    file. Tests, tools and docs stay in this repository.
 
      node tools/app-files.js <dest dir> [src dir]   copies them into dest
@@ -9,7 +10,7 @@ const path = require("path");
 
 function list(src) {
   const m = JSON.parse(fs.readFileSync(path.join(src, "metadata.json"), "utf8"));
-  const files = new Set(["metadata.json", "ChangeLog", m.icon, m.readme]);
+  const files = new Set(["metadata.json", "ChangeLog", m.icon, m.readme, m.interface]);
   for (const s of m.screenshots || []) files.add(s.url);
   for (const s of m.storage) if (s.url) files.add(s.url);
   return [...files].filter(f => f && fs.existsSync(path.join(src, f)));

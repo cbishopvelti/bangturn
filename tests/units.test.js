@@ -61,7 +61,7 @@ test("idle menu: Units, and the choice is kept for the next start", async h => {
   spyMenu(h);
   h.tx("showIdleMenu()");
   h.tx('MENU["Units: kph"]()');
-  assert.eq(menuItems(h), ["Length: 60 min", "Info", "Units: mph"]);
+  assert.eq(menuItems(h), ["Length: 60 min", "Info", "Units: mph", "GPS log: off"]);
   assert.eq(h.eval('MENU[""].selected'), 2, "stays on Units");
   h.tx(`${BT}.start(${h.eval("Date.now()") - 5 * MIN})`);
   await h.load("bangturn.app.js");
@@ -72,7 +72,7 @@ test("Settings > Apps > BangTurn: Units switches with a tap", async h => {
   spyMenu(h);
   h.tx(`eval(require("Storage").read("bangturn.settings.js"))(function(){global.BACK=1})`);
   h.tx('MENU["Units: kph"]()');
-  assert.eq(menuItems(h), ["Length: 60 min", "Units: mph"]);
+  assert.eq(menuItems(h), ["Length: 60 min", "Units: mph", "GPS log: off"]);
   assert.eq(h.eval(`${BT}.getUnits()`), "mph");
 });
 

@@ -32,6 +32,7 @@ Data files:
 | `bangturn.json` | Walk state (below) | `lib.js` only |
 | `bangturn.gps.json` | `{start, outKm, outMs, backKm, backMs, ...}`: distance and GPS time for each half, plus where tracking had got to, and the trail home's origin and spacing (`oa`, `oo`, `cd`) | `speed.js` only |
 | `bangturn.trail` | The trail home's points: the bytes of an `Int16Array` of metres east and north of the origin, 4 bytes a point, 2 KB at most | `speed.js` only |
+| `bangturn.log` | The GPS log (a StorageFile, only with the GPS log setting on): one CSV line per GPS fix of the last walk, 1 MB at most (docs/spec.md, "GPS log") | `speed.js` only; read and erased by `interface.html` in the App Loader |
 | `sched.json` | Six entries with ids `bangturn.*` | `lib.js` only, through the `sched` module |
 
 ## Walk state: `bangturn.json`

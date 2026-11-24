@@ -62,6 +62,7 @@ var SNAP = 25;        // m: this near an earlier point of the trail is back on i
 var SAVED = 12;       // m a cut must save, so a right-angle corner isn't one
 var SCAN = 5;         // m to move before the trail is looked through again
 var MAXC = 512;       // points kept: a longer trail is thinned to every other one
+var LOG = "bangturn.log"; // the GPS log (a StorageFile), when the setting is on
 
 /* Saved as bangturn.gps.json:
    { start,          the walk this belongs to (bangturn.json's start)
@@ -98,6 +99,8 @@ var px, py;         // where you are (the last good fix), in the trail's metres
 var sx, sy;         // where the trail was last looked through from
 var origMove;       // Android Integration's Bangle.moveGPSPower, while phoneFirst is in
 var holdTimer;      // pending: the watch's own GPS comes on unless the phone sends a fix
+var lf, lb;         // the GPS log being written (StorageFile) and its size so far
+var lsrc;           // sources ("p"/"w") whose first fix the log has in full
 
 /* Save the state. quick: leave the trail's file as it is. */
 function save(quick) {
@@ -185,10 +188,55 @@ function armEnd() {
   }, Math.max(0, T0 + DUR - Date.now()) + END_MARGIN);
 }
 
+/* ---- GPS log (the "GPS log" setting, off by default) ----
+   For checking the speeds against what GPS really sent: every GPS event
+   with a position, as it came and before any filtering, one CSV line each:
+     now,time,lat,lon,hdop,speed,sats,src
+   now: the watch's clock (ms); time: the fix's own time (ms, empty if it
+   has none); speed as the event gives it; src: p (the phone, through
+   Gadgetbridge) or w (the watch's own GPS). Lines starting with # are notes:
+   the walk at the top ("# start=<ms> t0=<ms> dur=<ms>", t0 being the start
+   moved by any -1 min), "# t0=<ms>" when -1 min moves it, and the first fix
+   from each source in full ("# p {...}"), to show every field it carries.
+   Each walk starts a new log. It stays after the walk until the next one, to
+   download with BangTurn's button in the App Loader (interface.html). */
+exports.LOG_MAX = 1000000; // bytes: the log stops here (about 4 hours of a fix a second)
+function logOpen(fresh) {
+  lf = undefined;
+  lsrc = "";
+  if (!require("bangturn").getLog()) return;
+  var st = require("Storage");
+  if (fresh && st.getFree() < exports.LOG_MAX) return; // no room: no log, rather than a full watch
+  lf = st.open(LOG, fresh ? "w" : "a");
+  lb = fresh ? 0 : lf.getLength();
+  if (!lb) logLine("# bangturn GPS log 1 start=" + S.start + " t0=" + T0 + " dur=" + DUR +
+    "\nnow,time,lat,lon,hdop,speed,sats,src");
+}
+function logLine(l) {
+  if (lb > exports.LOG_MAX) {
+    lf.write("# full\n");
+    lf = undefined;
+    return;
+  }
+  lf.write(l + "\n");
+  lb += l.length + 1;
+}
+function num(v) { return typeof v == "number" && !isNaN(v) ? v : ""; }
+function logFix(f, now) {
+  var c = f.externalSource ? "p" : "w";
+  if (lsrc.indexOf(c) < 0) {
+    lsrc += c;
+    logLine("# " + c + " " + JSON.stringify(f));
+  }
+  if (lf) logLine(now + "," + (f.time ? f.time.getTime() : "") + "," + f.lat + "," + f.lon + "," +
+    num(f.hdop) + "," + num(f.speed) + "," + num(f.satellites) + "," + c);
+}
+
 /* Stop tracking and turn GPS off, keeping the numbers. */
 function stop() {
   if (endTimer) clearTimeout(endTimer);
   endTimer = undefined;
+  lf = undefined;
   if (tracking) {
     tracking = false;
     Bangle.removeListener("GPS", onGPS);
@@ -351,7 +399,10 @@ function onGPS(f) {
   src = f.externalSource ? "phone" : "watch";
   srcAt = Date.now();
   if (f.externalSource && S) { S.ph = srcAt; dirty = true; }
-  if (f.fix && !isNaN(f.lat) && !isNaN(f.lon)) fixAt = srcAt;
+  if (f.fix && !isNaN(f.lat) && !isNaN(f.lon)) {
+    fixAt = srcAt;
+    if (lf) logFix(f, srcAt);
+  }
   // The walk is over. The core's "end" follows, but never leave GPS on.
   if (el >= DUR) return stop();
   if (!f.fix || isNaN(f.lat) || isNaN(f.lon) || f.hdop > HDOP_MAX) return;
@@ -416,8 +467,10 @@ function begin(s, fresh) {
     py = sy = Math.round((S.la - S.oa) * 1000 * KM_PER_DEG);
     trailAt = S.lt;
   } else if (S !== f) require("Storage").erase(TRAIL); // a new walk: a new trail
-  if (Date.now() - T0 < DUR) listen();
-  else stop();
+  if (Date.now() - T0 < DUR) {
+    logOpen(S !== f); // a new walk: a new log
+    listen();
+  } else stop();
 }
 
 /* Called by bangturn.boot.js when it finds a walk running. */
@@ -445,7 +498,9 @@ exports.event = function (type) {
     begin(s, true);
   } else if (!S || S.start !== s.start) begin(s);
   else {
-    T0 = require("bangturn").startTime(s); // "-1 min" moves the turnaround
+    var t0 = require("bangturn").startTime(s); // "-1 min" moves the turnaround
+    if (lf && t0 != T0) logLine("# t0=" + t0);
+    T0 = t0;
     if (tracking) armEnd(); // and the end
   }
 };
@@ -516,6 +571,11 @@ exports.get = function () {
    metres (without the bit to where you are), cd: m between points }. */
 exports.trail = function () {
   return { n: N, m: N ? C[N - 1] : 0, cd: S ? S.cd : CRUMB };
+};
+
+/* Size of the GPS log in bytes (the last walk's, or this one's so far), 0 if none */
+exports.logSize = function () {
+  return require("Storage").open(LOG, "r").getLength();
 };
 
 /* A speed from get() as text: "5.2 kph", or "-- kph" when it is null.

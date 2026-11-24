@@ -11,10 +11,10 @@
               with the speed needed to be back at 0, the speed now and the
               difference between them
    Swipe right goes back to the clock. The minutes-left widget is hidden.
-   - menu:    (idle: Length, Info, Units; the button goes back)
+   - menu:    (idle: Length, Info, Units, GPS log; the button goes back)
               during a walk: Resume, -1 min (offset shown), Cancel walk,
               Info (GPS via phone/watch, Watch GPS chip on/off, Phone GPS
-              setup check, the apps holding GPS, last fix, battery); back to the countdown
+              setup check, the apps holding GPS, last fix, battery, GPS log size); back to the countdown
               after 10 s with no input
    Keep the startup alert hook at the bottom (see docs/ARCHITECTURE.md). */
 var bt = require("bangturn");
@@ -409,6 +409,10 @@ function showIdleMenu(selected) {
   menu["Length: " + bt.getMins() + " min"] = function () { stopMenuTimer(); showPicker(); };
   menu["Info"] = function () { showInfo(); };
   unitsItem(menu, showIdleMenu, 2);
+  menu["GPS log: " + (bt.getLog() ? "on" : "off")] = function () {
+    bt.setLog(!bt.getLog());
+    showIdleMenu(3);
+  };
   E.showMenu(menu);
   startMenuTimer();
 }
@@ -486,6 +490,7 @@ function showInfo(selected) {
   row("GPS apps", gpsApps());
   row("Last fix", src.fixAge === null ? "none" : ago(src.fixAge));
   row("Battery", E.getBattery() + "%");
+  row("GPS log", bt.getLog() ? Math.round(speed.logSize() / 1024) + " KB" : "off");
   E.showMenu(menu);
   startMenuTimer();
 }
