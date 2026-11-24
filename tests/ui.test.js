@@ -391,7 +391,7 @@ test("button on idle screen opens the idle menu and never starts a walk", async 
   await h.wait(100);
   assert(!h.eval(`${BT}.isActive()`), "no walk started");
   assert.eq(h.eval("screen"), "menu");
-  assert.eq(menuItems(h), ["Length: 60 min", "Info", "Units: kph"]);
+  assert.eq(menuItems(h), ["Length: 60 min", "Info", "Units: kph", "GPS log: off"]);
   // the menu's back (what the button does in a menu) returns to idle
   h.tx('MENU[""].back()');
   assert.eq(h.eval("screen"), "main");
@@ -531,7 +531,7 @@ test("Info: where GPS comes from, whether the watch's chip is on, last fix, batt
   spyMenu(h);
   h.tx("showWalkMenu()");
   h.tx('MENU["Info"]()');
-  assert.eq(menuItems(h), ["GPS via", "Watch GPS", "Phone GPS", "GPS apps", "Last fix", "Battery"]);
+  assert.eq(menuItems(h), ["GPS via", "Watch GPS", "Phone GPS", "GPS apps", "Last fix", "Battery", "GPS log"]);
   assert.eq(h.eval("screen"), "menu", "the menu's timeout applies");
   assert.eq(h.eval('MENU["GPS via"].value'), "none yet");
   assert.eq(h.eval('MENU["Watch GPS"].value'), "off");
@@ -613,13 +613,13 @@ test("Info from the start screen's menu, and back to that menu", async h => {
   spyMenu(h);
   h.tx("showIdleMenu()");
   h.tx('MENU["Info"]()');
-  assert.eq(menuItems(h), ["GPS via", "Watch GPS", "Phone GPS", "GPS apps", "Last fix", "Battery"]);
+  assert.eq(menuItems(h), ["GPS via", "Watch GPS", "Phone GPS", "GPS apps", "Last fix", "Battery", "GPS log"]);
   assert.eq(h.eval('MENU["GPS via"].value'), "none yet");
   h.tx("Bangle.moveGPSPower=function(){};NRF.getSecurityStatus=function(){return {connected:true}}");
   h.tx('MENU["Phone GPS"].onchange()');
   assert.eq(h.eval('MENU["Phone GPS"].value'), "no walk", "nothing asks for GPS without a walk");
   h.tx('MENU[""].back()');
-  assert.eq(menuItems(h), ["Length: 60 min", "Info", "Units: kph"]);
+  assert.eq(menuItems(h), ["Length: 60 min", "Info", "Units: kph", "GPS log: off"]);
   assert.eq(h.eval('MENU[""].selected'), 1, "back on Info");
   assert.eq(h.eval(`${BT}.isActive()`), false, "no walk started");
 });

@@ -23,9 +23,11 @@ test("metadata.json: fields the App Loader needs, files, version", async () => {
     assert(listed.includes(f), `${f} is installed`);
   assert(fs.existsSync(path.join(ROOT, meta.readme)), "README exists");
   // the data files are the ones the code writes
-  assert.eq(meta.data.map(d => d.name).sort(), ["bangturn.gps.json", "bangturn.json", "bangturn.settings.json", "bangturn.trail"]);
+  assert.eq(meta.data.map(d => d.name).sort(), ["bangturn.gps.json", "bangturn.json", "bangturn.log", "bangturn.settings.json", "bangturn.trail"]);
   assert(/"bangturn\.json"/.test(fs.readFileSync(path.join(ROOT, "lib.js"), "utf8")));
   assert(/"bangturn\.gps\.json"/.test(fs.readFileSync(path.join(ROOT, "speed.js"), "utf8")));
+  assert(fs.existsSync(path.join(ROOT, meta.interface)), "interface page " + meta.interface);
+  assert(meta.data.find(d => d.name == "bangturn.log").storageFile, "the GPS log is a StorageFile, removed on uninstall");
   // the App Loader shows the last ChangeLog entry as the version's notes
   const log = fs.readFileSync(path.join(ROOT, "ChangeLog"), "utf8").trim().split("\n");
   assert(log[log.length - 1].startsWith(meta.version + ":"), "ChangeLog ends with " + meta.version);

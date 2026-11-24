@@ -24,9 +24,25 @@ Press the button on the start screen for a menu:
   length applies to the next walk.
 - **Info**: where the GPS comes from and the battery (see below).
 - **Units**: tap to switch the speeds between kph and mph.
+- **GPS log**: off by default. When on, each walk records every GPS fix the
+  watch gets, so the speeds can be checked against what GPS really sent (see
+  below).
 
-Length and Units are also in Settings > Apps > BangTurn, and Info and Units
+Length, Units and GPS log are also in Settings > Apps > BangTurn, and Info and Units
 in the menu during a walk.
+
+## GPS log
+
+Switch **GPS log** on before a walk. The walk then saves each GPS fix as it
+arrives (from the phone or the watch) to `bangturn.log` on the watch, about
+250 KB an hour, up to 1 MB. Info shows its size. The log of the last walk
+stays on the watch until the next walk starts a new one.
+
+To download it after the walk: open the App Loader you installed BangTurn
+from (on a computer, disconnect the watch from Gadgetbridge first), connect,
+go to **My Apps**, and press the download button next to BangTurn.
+Gadgetbridge's own App Loader on the phone works too, without disconnecting.
+**Download GPS log** saves it as a CSV file. The same page can delete it.
 
 ## Leaving the app
 

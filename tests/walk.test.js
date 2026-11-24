@@ -302,7 +302,7 @@ test("button on the idle screen opens the menu, a second press goes back, no wal
   spyMenu(h);
   await press(h);
   assert.eq(h.eval("screen"), "menu", "button opens the idle menu");
-  assert.eq(menuItems(h), ["Length: 60 min", "Info", "Units: kph"]);
+  assert.eq(menuItems(h), ["Length: 60 min", "Info", "Units: kph", "GPS log: off"]);
   await press(h);
   await h.wait(100);
   assert.eq(h.eval("screen"), "main", "button goes back to the idle screen");
