@@ -120,3 +120,46 @@ test("tap at the widget's spot inside BangTurn doesn't reload it", async h => {
   await h.wait(800);
   assert.eq(h.eval("global.MARK"), 1, "no reload");
 });
+
+/* from another app (not a clock): the tap stays inside the widget bar, so
+   the app keeps taps just under it */
+const OTHER = 'require("Storage").write("other.app.js","Bangle.loadWidgets();Bangle.drawWidgets();Bangle.setUI({mode:\\"custom\\",touch:function(b,e){global.APPTAP=e.y}});")';
+
+test("tap on the number in another app opens BangTurn", async h => {
+  h.tx(`${BT}.start(Date.now()-5*${MIN})`);
+  h.tx(OTHER);
+  await h.load("other.app.js");
+  assert.eq(h.eval("!!Bangle.CLOCK"), false, "not a clock");
+  assert.eq(width(h), 28, "number shown");
+  const [x, y] = centre(h);
+  tap(h, x, y);
+  await settle(h);
+  assert.eq(h.eval("global.__FILE__"), "bangturn.app.js");
+});
+
+test("in another app, a tap just under the bar goes to the app", async h => {
+  h.tx(`${BT}.start(Date.now()-5*${MIN})`);
+  h.tx(OTHER);
+  await h.load("other.app.js");
+  const [x, y0] = h.eval("[WIDGETS.bangturn.x+14,WIDGETS.bangturn.y]");
+  tap(h, x, y0 + 30);
+  await h.wait(800);
+  assert.eq(h.eval("global.__FILE__"), "other.app.js", "not opened");
+  assert.eq(h.eval("global.APPTAP"), y0 + 30, "the app got the tap");
+  h.tx("delete global.LOADING");
+  tap(h, x, y0 + 20); // bottom of the bar
+  await settle(h);
+  assert.eq(h.eval("global.__FILE__"), "bangturn.app.js");
+});
+
+test("in another app with the widget bar hidden, taps go to the app", async h => {
+  h.tx(`${BT}.start(Date.now()-5*${MIN})`);
+  h.tx(OTHER);
+  await h.load("other.app.js");
+  // what widget_utils.hide() does (the module isn't in the emulator)
+  h.tx('for(var w of WIDGETS){w._draw=w.draw;w.draw=function(){};w._area=w.area;w.area=""}');
+  const [x, y] = centre(h);
+  tap(h, x, y);
+  await h.wait(800);
+  assert.eq(h.eval("global.__FILE__"), "other.app.js");
+});
