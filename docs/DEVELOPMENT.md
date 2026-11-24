@@ -84,7 +84,10 @@ before a check that needs the watch on your wrist.
    (or long-press) back to the clock: the widget shows `60`, and reopening
    the app shows the right time. With the watch unlocked, tap the number by
    the battery: BangTurn opens. Try taps on its edges and on the widgets next
-   to it, and say if it's too fussy or opens when it shouldn't.
+   to it, and say if it's too fussy or opens when it shouldn't. Then open
+   another app that shows widgets (Settings, say) and tap the number there:
+   BangTurn opens too. Outside a clock only the widget bar counts, so a tap
+   just under the number goes to that app.
 3. **Button stops the alarm.** Start a turnaround test, go to the clock and
    let the watch lock. When the alarm starts (strong long buzzes, lit screen,
    TURN AROUND), press the button once. The alarm stops at once and the
