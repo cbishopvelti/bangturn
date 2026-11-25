@@ -32,14 +32,19 @@ exports.started = function () {
 /* Walk-back countdown: n short buzzes (1 at 15 min left, 2 at 8, 3 at 4,
    4 at 1). Runs inside whatever app is open: no drawing, no load(). Must
    not unlock the watch or light the screen: if the watch was locked and
-   unlocks while we buzz (or just after, T.settle), it is locked again. */
+   unlocks while we buzz (or just after, T.settle), it is locked again,
+   with the backlight off if it was off.
+   Only the backlight: on a Bangle.js 2, Bangle.setLCDPower(0) switches the
+   display itself off (all black), and nothing but setLCDPower(1) brings it
+   back, not a button press, a twist or changing app (Chris's watch went
+   black on the 3-buzz countdown, 3:45 before the end of an hour). */
 exports.countdown = function (n) {
   var i = 0, wasLocked = Bangle.isLocked();
   var wasLit = Bangle.isBacklightOn ? Bangle.isBacklightOn() : Bangle.isLCDOn();
   function onLock(locked) {
     if (locked || !wasLocked) return;
     Bangle.setLocked(true);
-    if (!wasLit) Bangle.setLCDPower(0);
+    if (!wasLit) Bangle.setBacklight(0);
   }
   Bangle.on("lock", onLock);
   (function next() {
