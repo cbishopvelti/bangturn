@@ -234,16 +234,23 @@ test("sched turnaround opens the app with the alarm, then the countdown", async 
 /* Buzzing can read as a twist or tap on a real watch and unlock it. The
    emulator has no accelerometer, so these fake the unlock it causes. */
 
-test("countdown keeps a locked watch locked and dark", async h => {
+test("countdown keeps a locked watch locked and dark, with the display on", async h => {
   await recordBuzz(h);
-  h.tx(`Bangle.setLocked(true);Bangle.setLCDPower(0)`);
+  // locked with the backlight off: how a Bangle.js 2 sits between wake-ups
+  // (its display itself is always on)
+  h.tx(`Bangle.setLocked(true);Bangle.setBacklight(0)`);
   await h.wait(100);
-  h.tx(`${AL}.countdown(2)`);
+  h.tx(`${AL}.countdown(3)`);
   await h.wait(200);
-  h.tx(`Bangle.setLocked(false);Bangle.emit("lock",false)`); // as a buzz-triggered twist would
+  // as a buzz-triggered twist would: unlocked and lit
+  h.tx(`Bangle.setLocked(false);Bangle.setBacklight(1);Bangle.emit("lock",false)`);
   await h.wait(100);
   assert.eq(h.eval("Bangle.isLocked()"), true, "locked again");
-  await h.wait(1500);
+  assert.eq(h.eval("Bangle.isBacklightOn()"), false, "backlight off again");
+  // Bangle.setLCDPower(0) turns a Bangle.js 2's display off (all black) and
+  // only setLCDPower(1) turns it back on: the black screen Chris saw
+  assert.eq(h.eval("Bangle.isLCDOn()"), true, "display still on");
+  await h.wait(2000); // 3 buzzes and the settle time
   assert.eq(h.eval("Bangle.isLocked()"), true, "still locked after the buzzes");
   // and once the countdown is over, unlocking works normally
   h.tx(`Bangle.setLocked(false);Bangle.emit("lock",false)`);
