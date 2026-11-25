@@ -143,10 +143,10 @@ test("Settings > Apps > BangTurn: walk length opens the wheels and saves", async
   captureButton(h);
   h.tx(`eval(require("Storage").read("bangturn.settings.js"))(function(){global.BACK=1})`);
   const items = h.eval(`Object.keys(MENU).filter(function(k){return k!==""})`);
-  assert.eq(items, ["Length: 60 min", "Units: kph", "GPS log: off"]);
+  assert.eq(items, ["Length: 60 min", "Units: kph", "GPS log: off", "Use watch GPS: yes"]);
   h.tx(`MENU["Length: 60 min"]()`);
   drag(h, 40, -15, 2); // hours up a row: 2 h
   press(h);
   assert.eq(h.eval(`${BT}.getMins()`), 120);
-  assert.eq(h.eval(`Object.keys(MENU).filter(function(k){return k!==""})`), ["Length: 120 min", "Units: kph", "GPS log: off"]);
+  assert.eq(h.eval(`Object.keys(MENU).filter(function(k){return k!==""})`), ["Length: 120 min", "Units: kph", "GPS log: off", "Use watch GPS: yes"]);
 });

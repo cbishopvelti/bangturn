@@ -27,9 +27,15 @@ Press the button on the start screen for a menu:
 - **GPS log**: off by default. When on, each walk records every GPS fix the
   watch gets, so the speeds can be checked against what GPS really sent (see
   below).
+- **Use watch GPS**: yes by default. Set it to **no** to keep the watch's own
+  GPS chip (the big battery drain) off: walks then use only the phone's GPS
+  (see Battery below), and if the phone's fixes stop, the speeds and the way
+  home wait for them rather than switching to the watch. Without the phone's
+  GPS set up, a walk then has no GPS at all: the timer and buzzes still work,
+  and the speeds show `--`. It applies at once, also during a walk.
 
-Length, Units and GPS log are also in Settings > Apps > BangTurn, and Info and Units
-in the menu during a walk.
+Length, Units, GPS log and Use watch GPS are also in Settings > Apps > BangTurn, and Info,
+Units and Use watch GPS in the menu during a walk.
 
 ## GPS log
 
@@ -73,7 +79,8 @@ What to expect (rough figures):
 - **A walk with the phone's GPS** (Android Integration, "Overwrite GPS" on):
   the watch's GPS chip goes off once the phone's fixes arrive, so the walk
   should cost the watch much less. The phone's battery pays instead. If the
-  phone stops sending fixes, the watch's own GPS takes over.
+  phone stops sending fixes, the watch's own GPS takes over, unless **Use
+  watch GPS** is set to no.
 
 To use the phone's GPS, all three of these are needed (otherwise every
 walk runs the watch's own GPS):

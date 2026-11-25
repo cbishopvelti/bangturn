@@ -3,7 +3,8 @@
    scroll wheel picker (bangturn.picker). A new length applies to the next
    walk; a walk that is running keeps its own. And the speed units
    (kph or mph), switched with a tap, and the GPS log (see
-   bangturn.speed), on or off. */
+   bangturn.speed), on or off, and whether the watch's own GPS may be used
+   (no: phone GPS only). */
 (function (back) {
   var bt = require("bangturn");
   function menu() {
@@ -22,6 +23,10 @@
     };
     m["GPS log: " + (bt.getLog() ? "on" : "off")] = function () {
       bt.setLog(!bt.getLog());
+      menu();
+    };
+    m["Use watch GPS: " + (bt.getWatchGps() ? "yes" : "no")] = function () {
+      bt.setWatchGps(!bt.getWatchGps());
       menu();
     };
     E.showMenu(m);

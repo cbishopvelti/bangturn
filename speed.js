@@ -101,6 +101,7 @@ var origMove;       // Android Integration's Bangle.moveGPSPower, while phoneFir
 var holdTimer;      // pending: the watch's own GPS comes on unless the phone sends a fix
 var lf, lb;         // the GPS log being written (StorageFile) and its size so far
 var lsrc;           // sources ("p"/"w") whose first fix the log has in full
+var allow = true;   // the Watch GPS setting, read when tracking starts (and on "settings")
 
 /* Save the state. quick: leave the trail's file as it is. */
 function save(quick) {
@@ -116,12 +117,16 @@ function listen() {
   armEnd();
   if (tracking) return;
   tracking = true;
+  allow = require("bangturn").getWatchGps();
   phoneFirst();
-  Bangle.setGPSPower(1, "bangturn");
+  // With the watch's GPS not allowed and no phone GPS (Android Integration's
+  // "Overwrite GPS" off) there is nothing to ask: the request would only
+  // power the chip.
+  if (allow || origMove) Bangle.setGPSPower(1, "bangturn");
   // Android Integration has just powered the watch's GPS, as it does on
   // every app load until the phone's next fix. If the phone was supplying
-  // GPS a moment ago, wait for it instead.
-  if (origMove && S && Date.now() - S.ph < PHONE_FRESH && btUp()) hold();
+  // GPS a moment ago, wait for it instead. Not allowed: off now, for good.
+  if (origMove && (!allow || S && Date.now() - S.ph < PHONE_FRESH && btUp())) hold();
   Bangle.on("GPS", onGPS);
   E.on("kill", save);
 }
@@ -134,7 +139,8 @@ function listen() {
    irregularly. The chip then flaps on and off all walk, which is the drain
    the phone's GPS is there to avoid. So during a walk BangTurn steps in:
    while the phone is connected, the chip only comes on after exports.PHONE_WAIT
-   with no phone fix. With no Bluetooth it comes on at once, as before. */
+   with no phone fix. With no Bluetooth it comes on at once, as before.
+   With the Watch GPS setting off it never comes on: hold() just keeps it off. */
 exports.PHONE_WAIT = 60000;
 
 function btUp() { return !!NRF.getSecurityStatus().connected; }
@@ -143,7 +149,9 @@ function btUp() { return !!NRF.getSecurityStatus().connected; }
    android app then calls moveGPSPower(0), which cancels this). */
 function hold() {
   if (holdTimer) clearTimeout(holdTimer);
+  holdTimer = undefined;
   origMove(0);
+  if (!allow) return;
   holdTimer = setTimeout(function () { holdTimer = undefined; origMove(1); }, exports.PHONE_WAIT);
 }
 /* Give the chip back at once if a hold is pending (no-op if no app wants GPS) */
@@ -157,7 +165,7 @@ function phoneFirst() {
   if (origMove || typeof Bangle.moveGPSPower != "function") return;
   origMove = Bangle.moveGPSPower;
   Bangle.moveGPSPower = function (on) {
-    if (on && btUp()) return hold();
+    if (on && (!allow || btUp())) return hold();
     if (holdTimer) clearTimeout(holdTimer);
     holdTimer = undefined;
     origMove(on);
@@ -480,6 +488,19 @@ exports.resume = function (s) {
 
 /* Called by bangturn.boot.js for each Bangle "bangturn" event. */
 exports.event = function (type) {
+  if (type == "settings") {
+    // the Watch GPS setting changed during a walk: start GPS again with it
+    // (the numbers and the trail carry on from the saved state)
+    if (tracking && require("bangturn").getWatchGps() != allow) {
+      dirty = true;
+      stop();
+      begin(require("bangturn").read());
+      // allowed again: the android app gave the chip up for the phone long
+      // ago (its own wait has passed), so turn it on unless hold() waits
+      if (allow && origMove && !holdTimer) origMove(1);
+    }
+    return;
+  }
   if (type == "end" || type == "cancel") {
     dirty = false; // nothing to keep
     stop();
@@ -591,6 +612,7 @@ exports.fmt = function (kph) {
    { from: "phone"|"watch"|null (no GPS event in the last SRC_MS),
      chip: true while the watch's own GPS chip is powered,
      wait: true while the chip is held off, waiting for the phone's next fix,
+     allow: the Watch GPS setting (false: the chip is never used),
      fixAge: ms since the last GPS event with a position, or null if none
        this walk (since the app loaded) }.
    chip asks the firmware (Bangle.getGPSFix() is undefined when the chip is
@@ -599,6 +621,6 @@ exports.fmt = function (kph) {
 var SRC_MS = 30000;
 exports.source = function () {
   var fresh = srcAt !== undefined && Date.now() - srcAt < SRC_MS;
-  return { from: fresh ? src : null, chip: Bangle.getGPSFix() !== undefined, wait: !!holdTimer,
+  return { from: fresh ? src : null, chip: Bangle.getGPSFix() !== undefined, wait: !!holdTimer, allow: tracking ? allow : require("bangturn").getWatchGps(),
     fixAge: fixAt === undefined ? null : Date.now() - fixAt };
 };
