@@ -391,7 +391,7 @@ test("button on idle screen opens the idle menu and never starts a walk", async 
   await h.wait(100);
   assert(!h.eval(`${BT}.isActive()`), "no walk started");
   assert.eq(h.eval("screen"), "menu");
-  assert.eq(menuItems(h), ["Length: 60 min", "Info", "Units: kph", "GPS log: off"]);
+  assert.eq(menuItems(h), ["Length: 60 min", "Info", "Units: kph", "GPS log: off", "Use watch GPS: yes"]);
   // the menu's back (what the button does in a menu) returns to idle
   h.tx('MENU[""].back()');
   assert.eq(h.eval("screen"), "main");
@@ -425,7 +425,7 @@ test("button while running opens the menu: Resume, -1 min, Cancel walk, Info, Un
   press(h);
   await h.wait(100);
   assert.eq(h.eval("screen"), "menu");
-  assert.eq(menuItems(h), ["Resume", "-1 min", "Cancel walk", "Info", "Units: kph"]);
+  assert.eq(menuItems(h), ["Resume", "-1 min", "Cancel walk", "Info", "Units: kph", "Use watch GPS: yes"]);
   h.tx('MENU["Resume"]()');
   assert.eq(h.eval("screen"), "main");
   assert.eq(h.eval("MENU"), null, "menu closed");
@@ -440,11 +440,11 @@ test("-1 min shows the offset and stays in the menu", async h => {
   h.tx("showWalkMenu()");
   h.tx('MENU["-1 min"]()');
   assert.eq(h.eval("screen"), "menu");
-  assert.eq(menuItems(h), ["Resume", "-1 min (-1)", "Cancel walk", "Info", "Units: kph"]);
+  assert.eq(menuItems(h), ["Resume", "-1 min (-1)", "Cancel walk", "Info", "Units: kph", "Use watch GPS: yes"]);
   assert.eq(h.eval('MENU[""].selected'), 1, "keeps -1 min selected");
   h.tx('MENU["-1 min (-1)"]()');
   h.tx('MENU["-1 min (-2)"]()');
-  assert.eq(menuItems(h), ["Resume", "-1 min (-3)", "Cancel walk", "Info", "Units: kph"]);
+  assert.eq(menuItems(h), ["Resume", "-1 min (-3)", "Cancel walk", "Info", "Units: kph", "Use watch GPS: yes"]);
   assert.eq(h.eval(`${BT}.read().offset`), 3);
   h.tx('MENU["Resume"]()');
   const t = screenText(h);
@@ -557,7 +557,7 @@ test("Info: where GPS comes from, whether the watch's chip is on, last fix, batt
   assert.eq(h.eval('MENU[""].selected'), 0);
   // back: the walk menu, on Info
   h.tx('MENU[""].back()');
-  assert.eq(menuItems(h), ["Resume", "-1 min", "Cancel walk", "Info", "Units: kph"]);
+  assert.eq(menuItems(h), ["Resume", "-1 min", "Cancel walk", "Info", "Units: kph", "Use watch GPS: yes"]);
   assert.eq(h.eval('MENU[""].selected'), 3);
 });
 
@@ -619,7 +619,7 @@ test("Info from the start screen's menu, and back to that menu", async h => {
   h.tx('MENU["Phone GPS"].onchange()');
   assert.eq(h.eval('MENU["Phone GPS"].value'), "no walk", "nothing asks for GPS without a walk");
   h.tx('MENU[""].back()');
-  assert.eq(menuItems(h), ["Length: 60 min", "Info", "Units: kph", "GPS log: off"]);
+  assert.eq(menuItems(h), ["Length: 60 min", "Info", "Units: kph", "GPS log: off", "Use watch GPS: yes"]);
   assert.eq(h.eval('MENU[""].selected'), 1, "back on Info");
   assert.eq(h.eval(`${BT}.isActive()`), false, "no walk started");
 });
