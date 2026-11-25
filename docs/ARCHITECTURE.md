@@ -154,9 +154,11 @@ directly and never read the `quiet` setting. While the turnaround alarm
 shows, it owns the UI (`Bangle.setUI` custom, plus a one-shot `BTN1`
 watch); the app sets its own UI again in `done()`.
 Buzzing can read as a twist or tap on the accelerometer, which unlocks a
-Bangle.js 2. The user's wake-up settings are left alone, so instead a
-countdown re-locks a watch that was locked if it unlocks while buzzing (or
-within 500 ms after), and the turnaround alarm doesn't stop on an unlock:
+Bangle.js 2 and lights it for a moment (the firmware doesn't know the motor
+is running). The user's wake-up settings are left alone and the countdown
+just buzzes: it never touches the lock, backlight or display (calling
+`Bangle.setLCDPower(0)` on a Bangle.js 2 turns the display off and nothing
+but `setLCDPower(1)` turns it back on). The turnaround alarm doesn't stop on an unlock:
 only a button press, a tap or the 6 s timeout stop it. Timings are in
 `require("bangturn.alerts").T`.
 

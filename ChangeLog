@@ -2,3 +2,4 @@
 1.00: First release in the App Loader: walk length setting, kph or mph, countdown buzzes at 1/2, 1/4 and 1/8 of the way back, time to get back and speed needed along the path walked, phone GPS (Gadgetbridge) with GPS status in Info, tap the widget to open, back to the clock 8 min after the walk ends
 1.01: GPS log setting: records each walk's raw GPS fixes, to download from the App Loader and check the speeds against
 1.02: Fix the screen going black (and staying black) when a countdown buzz unlocked the watch: only the backlight is turned off now
+1.03: Countdown buzzes just buzz: no re-lock afterwards (a buzz may light and unlock the watch for a moment)
