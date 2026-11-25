@@ -84,7 +84,7 @@ On the walk screen:
 - Countdown buzzes also play in Quiet Mode.
 - Turnaround alarm: distinct and prominent. A continuous pattern of long full-strength buzzes (e.g. 600 ms on, 200 ms off), unlike any notification buzz, with the screen lit.
 - It stops on a button press or a tap on the screen, or after **6 seconds**, whichever comes first. No repeats. (Not on unlock: on the real watch the buzz itself reads as a twist or tap and unlocks it. Twist and tap wake-ups stay on, as Chris wants them.)
-- Countdown buzzes must not unlock the watch: if a buzz unlocks a locked watch, it is locked again.
+- Countdown buzzes just buzz. A buzz may light and unlock the watch for a moment (the vibration reads as a twist or tap); it locks again on its normal timeout (Chris, 2026-11-25: no workarounds).
 - **Buzzes in Quiet Mode**, since this alarm is the whole point of the app.
 
 ## Background behaviour

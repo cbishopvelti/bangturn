@@ -3,3 +3,4 @@
 1.01: GPS log setting: records each walk's raw GPS fixes, to download from the App Loader and check the speeds against
 1.02: Fix the screen going black (and staying black) when a countdown buzz unlocked the watch: only the backlight is turned off now
 1.03: Use watch GPS setting: set it to no to keep the watch's own GPS chip off and use only the phone's GPS
+1.04: Countdown buzzes just buzz: no re-lock afterwards (a buzz may light and unlock the watch for a moment)

@@ -234,7 +234,7 @@ test("sched turnaround opens the app with the alarm, then the countdown", async 
 /* Buzzing can read as a twist or tap on a real watch and unlock it. The
    emulator has no accelerometer, so these fake the unlock it causes. */
 
-test("countdown keeps a locked watch locked and dark, with the display on", async h => {
+test("countdown leaves the lock, backlight and display alone", async h => {
   await recordBuzz(h);
   // locked with the backlight off: how a Bangle.js 2 sits between wake-ups
   // (its display itself is always on)
@@ -244,18 +244,12 @@ test("countdown keeps a locked watch locked and dark, with the display on", asyn
   await h.wait(200);
   // as a buzz-triggered twist would: unlocked and lit
   h.tx(`Bangle.setLocked(false);Bangle.setBacklight(1);Bangle.emit("lock",false)`);
-  await h.wait(100);
-  assert.eq(h.eval("Bangle.isLocked()"), true, "locked again");
-  assert.eq(h.eval("Bangle.isBacklightOn()"), false, "backlight off again");
+  await h.wait(2000);
+  assert.eq(buzzes(h).length, 3, "all 3 buzzes");
+  assert.eq(h.eval("Bangle.isLocked()"), false, "the unlock is left alone");
   // Bangle.setLCDPower(0) turns a Bangle.js 2's display off (all black) and
   // only setLCDPower(1) turns it back on: the black screen Chris saw
   assert.eq(h.eval("Bangle.isLCDOn()"), true, "display still on");
-  await h.wait(2000); // 3 buzzes and the settle time
-  assert.eq(h.eval("Bangle.isLocked()"), true, "still locked after the buzzes");
-  // and once the countdown is over, unlocking works normally
-  h.tx(`Bangle.setLocked(false);Bangle.emit("lock",false)`);
-  await h.wait(100);
-  assert.eq(h.eval("Bangle.isLocked()"), false, "real unlock later is left alone");
 });
 
 test("countdown leaves an unlocked watch unlocked", async h => {
@@ -274,18 +268,4 @@ test("alerts leave twist and tap wake-ups as the user set them", async h => {
   await h.wait(500);
   assert.eq(h.eval(W), [true, true, false], "unchanged while buzzing");
   h.tx(`STOP()`);
-});
-
-test("countdown re-locks an unlock just after the last buzz", async h => {
-  await recordBuzz(h);
-  h.tx(`Bangle.setLocked(true)`);
-  h.tx(`${AL}.countdown(1)`);
-  await h.wait(600); // buzz done, inside the settle time
-  h.tx(`Bangle.setLocked(false);Bangle.emit("lock",false)`);
-  await h.wait(100);
-  assert.eq(h.eval("Bangle.isLocked()"), true, "locked again");
-  await h.wait(600);
-  h.tx(`Bangle.setLocked(false);Bangle.emit("lock",false)`);
-  await h.wait(100);
-  assert.eq(h.eval("Bangle.isLocked()"), false, "later unlock left alone");
 });
