@@ -64,6 +64,20 @@ test("idle screen: 60:00, time of day, tap to start", async h => {
   assert(!drawn.some(s => s.indexOf("Turn around") >= 0), "no turnaround line");
 });
 
+test("idle screen: a tap on the widget bar is left to the widgets, not a start", async h => {
+  // another app's widget with its own touch handler, top left of the bar
+  h.tx(`require("Storage").write("zz.wid.js","WIDGETS.zz={area:'tl',width:24,draw:function(){}};Bangle.on('touch',function(b,e){if(e&&e.y<24&&e.x<WIDGETS.zz.x+24)global.ZZ=(global.ZZ||0)+1;});")`);
+  await h.load("bangturn.app.js");
+  h.tx('Bangle.setLocked(false)');
+  h.tx(`Bangle.emit("touch",1,{x:10,y:10,type:0})`);
+  await h.wait(300);
+  assert.eq(h.eval("global.ZZ"), 1, "the other widget got the tap");
+  assert.eq(h.eval(`${BT}.isActive()`), false, "no walk started");
+  h.tx(`Bangle.emit("touch",1,{x:88,y:88,type:0})`); // below the bar still starts
+  assert.eq(h.eval(`${BT}.isActive()`), true, "tap below the bar starts");
+  assert.eq(h.eval("global.ZZ"), 1);
+});
+
 test("time of day has seconds while unlocked, grey seconds while locked", async h => {
   await h.load("bangturn.app.js");
   const t = h.eval("new Date(2026,10,19,9,5,7).getTime()");
