@@ -374,7 +374,13 @@ function showMain() {
     // the button never starts a walk (a tap does): it opens a menu, and
     // in the menu it comes back here
     btn: function () { if (bt.isActive()) showWalkMenu(); else { stopClose(); showIdleMenu(); } },
-    touch: function () { if (!bt.isActive()) start(); },
+    // a tap below the widget bar starts a walk; taps on the bar are for
+    // the widgets there (other apps' widgets have their own touch
+    // handlers, which still run, but a walk shouldn't start as well)
+    touch: function (b, e) {
+      if (e && e.y < Bangle.appRect.y) return;
+      if (!bt.isActive()) start();
+    },
     // swipe right: back to the clock (the walk keeps running). No left
     // swipe: another app on the watch uses swipes, so the length is in
     // the button menu
