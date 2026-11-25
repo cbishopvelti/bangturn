@@ -11,7 +11,7 @@
               with the speed needed to be back at 0, the speed now and the
               difference between them
    Swipe right goes back to the clock. The minutes-left widget is hidden.
-   - menu:    (idle: Length, Info, Units, GPS log; the button goes back)
+   - menu:    (idle: Length, Info, Units, GPS log, Use watch GPS; the button goes back)
               during a walk: Resume, -1 min (offset shown), Cancel walk,
               Info (GPS via phone/watch, Watch GPS chip on/off, Phone GPS
               setup check, the apps holding GPS, last fix, battery, GPS log size); back to the countdown
@@ -400,6 +400,16 @@ function start() {
   tick();
 }
 
+/* The Use watch GPS item of both button menus: a tap allows or stops
+   BangTurn using the watch's own GPS chip (no: phone GPS only). Applies at
+   once, also to a walk that is running. Stays on item i. */
+function watchGpsItem(menu, again, i) {
+  menu["Use watch GPS: " + (bt.getWatchGps() ? "yes" : "no")] = function () {
+    bt.setWatchGps(!bt.getWatchGps());
+    again(i);
+  };
+}
+
 /* Before a walk: set the length (a tap on the idle screen starts it). Back (or the button) returns
    to the idle screen without starting anything. */
 function showIdleMenu(selected) {
@@ -413,6 +423,7 @@ function showIdleMenu(selected) {
     bt.setLog(!bt.getLog());
     showIdleMenu(3);
   };
+  watchGpsItem(menu, showIdleMenu, 4);
   E.showMenu(menu);
   startMenuTimer();
 }
@@ -430,6 +441,7 @@ function showWalkMenu(selected) {
   menu["Cancel walk"] = function () { bt.cancel(); showMain(); };
   menu["Info"] = function () { showInfo(); };
   unitsItem(menu, showWalkMenu, 4);
+  watchGpsItem(menu, showWalkMenu, 5);
   E.showMenu(menu);
   startMenuTimer();
 }
@@ -485,7 +497,7 @@ function showInfo(selected) {
     menu[name] = { value: value, onchange: function () { showInfo(i); } };
   }
   row("GPS via", src.from || "none yet");
-  row("Watch GPS", src.chip ? "ON" : "off");
+  row("Watch GPS", src.chip ? "ON" : src.allow ? "off" : "not used");
   row("Phone GPS", phoneGPS(src));
   row("GPS apps", gpsApps());
   row("Last fix", src.fixAge === null ? "none" : ago(src.fixAge));

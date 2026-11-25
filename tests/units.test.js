@@ -45,7 +45,7 @@ test("walk menu: Units switches the speed rows to mph and back", async h => {
   spyMenu(h);
   h.tx("showWalkMenu()");
   h.tx('MENU["Units: kph"]()');
-  assert.eq(menuItems(h), ["Resume", "-1 min", "Cancel walk", "Info", "Units: mph"]);
+  assert.eq(menuItems(h), ["Resume", "-1 min", "Cancel walk", "Info", "Units: mph", "Use watch GPS: yes"]);
   assert.eq(h.eval('MENU[""].selected'), 4, "stays on Units");
   assert.eq(h.eval(`${BT}.getUnits()`), "mph", "saved");
   assert.eq(rows(h), ["Out 3.2 mph", "Back 3.0 mph"]);
@@ -61,7 +61,7 @@ test("idle menu: Units, and the choice is kept for the next start", async h => {
   spyMenu(h);
   h.tx("showIdleMenu()");
   h.tx('MENU["Units: kph"]()');
-  assert.eq(menuItems(h), ["Length: 60 min", "Info", "Units: mph", "GPS log: off"]);
+  assert.eq(menuItems(h), ["Length: 60 min", "Info", "Units: mph", "GPS log: off", "Use watch GPS: yes"]);
   assert.eq(h.eval('MENU[""].selected'), 2, "stays on Units");
   h.tx(`${BT}.start(${h.eval("Date.now()") - 5 * MIN})`);
   await h.load("bangturn.app.js");
@@ -72,7 +72,7 @@ test("Settings > Apps > BangTurn: Units switches with a tap", async h => {
   spyMenu(h);
   h.tx(`eval(require("Storage").read("bangturn.settings.js"))(function(){global.BACK=1})`);
   h.tx('MENU["Units: kph"]()');
-  assert.eq(menuItems(h), ["Length: 60 min", "Units: mph", "GPS log: off"]);
+  assert.eq(menuItems(h), ["Length: 60 min", "Units: mph", "GPS log: off", "Use watch GPS: yes"]);
   assert.eq(h.eval(`${BT}.getUnits()`), "mph");
 });
 
