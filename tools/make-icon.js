@@ -12,15 +12,18 @@ const png = require("./png");
 
 const SIZE = 48;
 const SS = 8; // samples per pixel each way, for the PNG's soft edges
-const W = 7; // stroke width
-const DX = 4, DY = -1; // centres the shape in the 48x48 box
 
-const LX = 14 + DX, RX = 33 + DX; // the stems' centre lines
-const CX = (LX + RX) / 2, CY = 20 + DY; // centre of the half circle
+/* Everything sits on the pixel grid, so the PNG only has soft pixels where
+   an edge really is curved or sloping, and the 1-bit version has even
+   steps: straight edges fall between pixels, the half circle's centre and
+   radii are whole pixels, and the arrowhead's sides are at 45 degrees. */
+const W = 6; // stroke width
+const LX = 18, RX = 36; // the stems' centre lines
+const CX = (LX + RX) / 2, CY = 18; // centre of the half circle
 const R = (RX - LX) / 2; // its radius, to the middle of the stroke
-const NECK = 31 + DY; // where the left stem meets the arrowhead
-const HEAD_Y = 30 + DY, TIP_Y = 45 + DY, HEAD_W = 11; // arrowhead
-const BOTTOM = 45 + DY; // foot of the right stem
+const HEAD_Y = 31, TIP_Y = 42, HEAD_W = 11; // arrowhead: top, tip, half width
+const NECK = HEAD_Y; // where the left stem meets the arrowhead
+const BOTTOM = TIP_Y; // foot of the right stem, level with the tip
 
 /* Is the point (x, y), in pixels, inside the arrow? */
 function inside(x, y) {
