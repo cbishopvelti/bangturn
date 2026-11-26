@@ -7,6 +7,7 @@
     "setup-emulator": "sh tests/setup-emulator.sh",
     "bundle": "node tools/install.js",
     "screenshots": "node tools/screenshots.js",
+    "icon": "node tools/make-icon.js",
     "store-check": "sh tools/store-check.sh"
   }
 }
